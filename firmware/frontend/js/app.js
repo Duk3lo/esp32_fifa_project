@@ -1,12 +1,15 @@
+let appState = { connected: true };
+
+const JAVA_API_BASE = "http://fifa-backend.local:8081";
+
 window.addEventListener("load", () => {
     cargarPinesHardware();
     if (typeof connectWebSocket === "function") connectWebSocket();
-
-    // Redirección si se pierde la conexión y obtención del SSID actual
     setInterval(async () => {
         try {
             let res = await fetch("/api/status");
             let data = await res.json();
+            appState.connected = data.connected;
             if (!data.connected) {
                 window.location.href = "/";
             } else {
@@ -21,13 +24,13 @@ function showTab(tabId, btnElement) {
     document.querySelectorAll('.nav-btn').forEach(el => el.classList.remove('active'));
     document.getElementById(tabId).classList.add('active');
     if (btnElement) btnElement.classList.add('active');
-    
-    // Si entramos a la pestaña wifi, cargamos las redes
     if (tabId === 'tab-wifi' && typeof WifiUI !== "undefined") {
         WifiUI.loadSaved();
     }
+    if (tabId === 'tab-stats') {
+        cargarReportes();
+    }
 }
-
 
 let html5QrCode = null;
 
@@ -113,9 +116,6 @@ function sendWsMessage(type, payload) {
     }
 }
 
-// ==========================================
-// LÓGICA DE HARDWARE Y TECLADO MATRICIAL
-// ==========================================
 async function cargarPinesHardware() {
     try {
         let res = await fetch("/api/hw/config");
@@ -173,3 +173,66 @@ setInterval(async () => {
         }
     } catch (e) {}
 }, 400);
+
+let chartPronosticos = null;
+
+async function cargarReportes() {
+    await cargarConteoPronosticos();
+    await cargarRanking();
+}
+
+async function cargarConteoPronosticos() {
+    try {
+        let res = await fetch(`${JAVA_API_BASE}/api/reportes/cantidad-por-usuario`);
+        let data = await res.json();
+
+        const labels = data.map(d => d.usuario);
+        const valores = data.map(d => d.cantidad);
+
+        const ctx = document.getElementById("chart-pronosticos");
+        if (chartPronosticos) chartPronosticos.destroy();
+
+        chartPronosticos = new Chart(ctx, {
+            type: "bar",
+            data: {
+                labels,
+                datasets: [{
+                    label: "Pronósticos registrados",
+                    data: valores,
+                    backgroundColor: "#00d2ff"
+                }]
+            },
+            options: {
+                responsive: true,
+                scales: { y: { beginAtZero: true, ticks: { precision: 0 } } },
+                plugins: { legend: { display: false } }
+            }
+        });
+    } catch (e) {
+        console.log("No se pudo cargar el conteo de pronósticos:", e);
+    }
+}
+
+async function cargarRanking() {
+    const tbody = document.querySelector("#tabla-ranking tbody");
+    try {
+        let res = await fetch(`${JAVA_API_BASE}/api/reportes/ranking`);
+        let data = await res.json();
+
+        if (!data.length) {
+            tbody.innerHTML = `<tr><td colspan="4" style="text-align:center;color:var(--text-muted);">Sin pronósticos registrados</td></tr>`;
+            return;
+        }
+
+        tbody.innerHTML = data.map(r => `
+            <tr>
+                <td>${r.usuario}</td>
+                <td>${r.partido}</td>
+                <td>${r.pronostico}</td>
+                <td><span class="estado-badge estado-${r.estado.toLowerCase()}">${r.estado}</span></td>
+            </tr>
+        `).join("");
+    } catch (e) {
+        tbody.innerHTML = `<tr><td colspan="4" style="text-align:center;color:var(--danger);">No se pudo conectar con el backend Java (revisa JAVA_API_BASE y que esté corriendo)</td></tr>`;
+    }
+}

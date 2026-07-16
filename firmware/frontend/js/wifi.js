@@ -8,7 +8,6 @@ const WifiUI = (() => {
         currentConnectedSsid = ssid;
     }
 
-    // Listener para validar longitud de la contraseña en tiempo real
     document.addEventListener("DOMContentLoaded", () => {
         const passInput = document.getElementById("wifi-modal-pass");
         if (passInput) {
@@ -142,7 +141,7 @@ const WifiUI = (() => {
             if (isCurrent) {
                 li.style.opacity = "0.6";
                 li.style.cursor = "not-allowed";
-                li.onclick = null; // No permite hacer clic
+                li.onclick = null;
             } else {
                 li.onclick = () => openConnectModal(net.ssid, secured);
             }

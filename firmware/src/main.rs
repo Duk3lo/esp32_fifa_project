@@ -13,7 +13,7 @@ use wifi::mdns::start_mdns;
 use wifi::scanner;
 
 use hardware::leds::{SystemLeds, SharedLeds};
-use hardware::keypad::start_keypad_service;
+use hardware::keypad::{start_keypad_service, KeyEvent};
 
 fn main() {
     esp_idf_svc::sys::link_patches();
@@ -31,7 +31,7 @@ fn main() {
     let scan_state = scanner::new_scan_state();
     
     // 2. Estado Compartido para Hardware
-    let keypad_buf = Arc::new(Mutex::new(Vec::<char>::new()));
+    let keypad_buf = Arc::new(Mutex::new(Vec::<KeyEvent>::new())); // <-- Cambio a KeyEvent
     let shared_leds: SharedLeds = Arc::new(Mutex::new(None));
 
     // 3. Leer Configuración Hardware desde NVS (LEDs)

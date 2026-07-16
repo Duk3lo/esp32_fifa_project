@@ -1,17 +1,30 @@
+use esp_idf_svc::hal::delay::Ets;
 use esp_idf_svc::hal::gpio::*;
 use esp_idf_svc::nvs::{EspDefaultNvsPartition, EspNvs};
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
-use std::time::Duration;
 use std::thread;
+use std::time::Duration;
+
+#[derive(Clone)]
+pub struct KeyEvent {
+    pub id: usize,
+    pub key: char,
+}
+
+static KEY_ID: AtomicUsize = AtomicUsize::new(1);
 
 pub struct KeypadScanner {
-    rows: Vec<PinDriver<'static, Output>>, 
+    rows: Vec<PinDriver<'static, Output>>,
     cols: Vec<PinDriver<'static, Input>>,
     matrix: [[char; 4]; 4],
 }
 
 impl KeypadScanner {
-    pub fn new(row_pins: Vec<AnyIOPin<'static>>, col_pins: Vec<AnyIOPin<'static>>) -> Result<Self, anyhow::Error> {
+    pub fn new(
+        row_pins: Vec<AnyIOPin<'static>>,
+        col_pins: Vec<AnyIOPin<'static>>,
+    ) -> Result<Self, anyhow::Error> {
         let mut rows = Vec::new();
         for pin in row_pins {
             let mut driver = PinDriver::output(pin)?;
@@ -38,7 +51,7 @@ impl KeypadScanner {
     pub fn scan(&mut self) -> Option<char> {
         for r in 0..self.rows.len() {
             let _ = self.rows[r].set_low();
-            thread::sleep(Duration::from_micros(200));
+            Ets::delay_us(200_u32);
 
             for c in 0..self.cols.len() {
                 if self.cols[c].is_low() {
@@ -56,14 +69,14 @@ fn get_any_pin(pin_num: u32) -> Option<AnyIOPin<'static>> {
     match pin_num {
         0 | 2 | 4 | 5 | 12..=19 | 21..=23 | 25..=27 | 32 | 33 => {
             Some(unsafe { AnyIOPin::steal(pin_num as u8) })
-        },
+        }
         _ => None,
     }
 }
 
 pub fn start_keypad_service(
     nvs_partition: EspDefaultNvsPartition,
-    keypad_buf: Arc<Mutex<Vec<char>>>,
+    keypad_buf: Arc<Mutex<Vec<KeyEvent>>>,
 ) {
     thread::spawn(move || {
         let mut filas_str = String::new();
@@ -73,20 +86,32 @@ pub fn start_keypad_service(
             let mut buf = vec![0; 1024];
             if let Ok(Some(json_str)) = nvs.get_str("pins", &mut buf) {
                 if let Ok(parsed) = serde_json::from_str::<serde_json::Value>(json_str) {
-                    filas_str = parsed.get("filas").and_then(|v| v.as_str()).unwrap_or("").to_string();
-                    cols_str = parsed.get("cols").and_then(|v| v.as_str()).unwrap_or("").to_string();
+                    filas_str = parsed
+                        .get("filas")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("")
+                        .to_string();
+                    cols_str = parsed
+                        .get("cols")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("")
+                        .to_string();
                 }
             }
         }
 
-        if filas_str.is_empty() || cols_str.is_empty() { return; }
+        if filas_str.is_empty() || cols_str.is_empty() {
+            return;
+        }
 
-        let row_pins: Vec<AnyIOPin<'static>> = filas_str.split(',')
+        let row_pins: Vec<AnyIOPin<'static>> = filas_str
+            .split(',')
             .filter_map(|s| s.trim().parse::<u32>().ok())
             .filter_map(|num| get_any_pin(num))
             .collect();
 
-        let col_pins: Vec<AnyIOPin<'static>> = cols_str.split(',')
+        let col_pins: Vec<AnyIOPin<'static>> = cols_str
+            .split(',')
             .filter_map(|s| s.trim().parse::<u32>().ok())
             .filter_map(|num| get_any_pin(num))
             .collect();
@@ -99,7 +124,11 @@ pub fn start_keypad_service(
                 if let Some(key) = scanner.scan() {
                     if last_key != Some(key) {
                         if let Ok(mut buf) = keypad_buf.lock() {
-                            buf.push(key);
+                            let id = KEY_ID.fetch_add(1, Ordering::SeqCst);
+                            buf.push(KeyEvent { id, key });
+                            if buf.len() > 50 {
+                                buf.remove(0);
+                            }
                         }
                         last_key = Some(key);
                     }

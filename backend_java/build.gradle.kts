@@ -23,6 +23,9 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-starter-web")
     implementation("org.springframework.boot:spring-boot-starter-websocket")
 
+    // JmDNS
+    implementation("org.jmdns:jmdns:3.5.9")
+
     // Driver de Base de Datos
     runtimeOnly("com.mysql:mysql-connector-j")
 

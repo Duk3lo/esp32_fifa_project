@@ -30,6 +30,8 @@ public class Esp32Service {
     private Partido partidoActual;
     private int golesA;
 
+    private int lastKeypadId = 0;
+
     public Esp32Service(UsuarioRepository u, PartidoRepository p, PronosticoRepository pr) {
         this.usuarioRepo = u;
         this.partidoRepo = p;
@@ -39,11 +41,19 @@ public class Esp32Service {
     @Scheduled(fixedRate = 400)
     public void pollTeclado() {
         try {
-            // RestTemplate mapea el JSON directamente a nuestra clase
-            KeypadResponse resp = restTemplate.getForObject(espUrl + "/api/keypad/poll", KeypadResponse.class);
-            if (resp != null && resp.getKeys() != null) {
-                for (String key : resp.getKeys()) {
-                    procesarTecla(key);
+            // Ahora enviamos el lastKeypadId en la URL
+            String url = espUrl + "/api/keypad/poll?last_id=" + lastKeypadId;
+            KeypadResponse resp = restTemplate.getForObject(url, KeypadResponse.class);
+
+            if (resp != null) {
+                if (resp.getLast_id() > lastKeypadId) {
+                    lastKeypadId = resp.getLast_id();
+                }
+
+                if (resp.getKeys() != null && !resp.getKeys().isEmpty()) {
+                    for (String key : resp.getKeys()) {
+                        procesarTecla(key);
+                    }
                 }
             }
         } catch (Exception e) {
@@ -55,7 +65,7 @@ public class Esp32Service {
         if (tecla.equals("#") || tecla.equals("*")) {
             String input = buffer.toString();
             buffer.setLength(0);
-            ejecutarLogica(input, tecla); // Aquí pasamos la tecla que se usó para confirmar
+            ejecutarLogica(input, tecla);
         } else if (tecla.equals("D")) {
             if (!buffer.isEmpty()) buffer.deleteCharAt(buffer.length() - 1);
         } else {

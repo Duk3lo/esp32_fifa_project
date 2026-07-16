@@ -6,6 +6,7 @@ use esp_idf_svc::nvs::EspDefaultNvsPartition;
 use serde_json::json;
 use std::sync::{Arc, Mutex};
 use crate::hardware::leds::SharedLeds;
+use crate::hardware::keypad::KeyEvent;
 
 use crate::wifi::init::SharedWifi;
 
@@ -20,10 +21,14 @@ pub fn start_web(
     wifi: SharedWifi,
     nvs: EspDefaultNvsPartition,
     scan_state: crate::wifi::scanner::SharedScanState,
-    keypad_buf: Arc<Mutex<Vec<char>>>,
+    keypad_buf: Arc<Mutex<Vec<KeyEvent>>>,
     shared_leds: SharedLeds,
 ) -> Result<EspHttpServer<'static>> {
-    let http_config = Configuration { stack_size: 10240, ..Default::default() };
+    let http_config = Configuration { 
+        stack_size: 10240, 
+        max_uri_handlers: 30, 
+        ..Default::default() 
+    };
     let mut server = EspHttpServer::new(&http_config)?;
 
     let wifi_index = wifi.clone();
@@ -49,11 +54,29 @@ pub fn start_web(
     })?;
 
     server.fn_handler("/api/keypad/poll", Method::Get, move |req| -> Result<()> {
-        let mut buffer = keypad_buf.lock().unwrap();
-        let keys_pressed = buffer.clone();
-        buffer.clear();
+        let query = req.uri().split('?').nth(1).unwrap_or("");
+        let last_id: usize = query.split("last_id=")
+            .nth(1)
+            .unwrap_or("0")
+            .split('&')
+            .next()
+            .unwrap_or("0")
+            .parse()
+            .unwrap_or(0);
+            
+        let buffer = keypad_buf.lock().unwrap();
+        
+        // Filtramos solo las teclas que son más nuevas que el ID recibido
+        let new_keys: Vec<char> = buffer.iter()
+            .filter(|k| k.id > last_id)
+            .map(|k| k.key)
+            .collect();
+            
+        // El último ID es el de la tecla más reciente (si no hay nuevas, devolvemos el mismo)
+        let max_id = buffer.last().map(|k| k.id).unwrap_or(last_id);
+
         req.into_response(200, Some("OK"), &[("Content-Type", "application/json")])?
-            .write_all(json!({ "keys": keys_pressed }).to_string().as_bytes())?;
+            .write_all(json!({ "keys": new_keys, "last_id": max_id }).to_string().as_bytes())?;
         Ok(())
     })?;
 
