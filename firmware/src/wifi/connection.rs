@@ -1,12 +1,12 @@
 use crate::wifi::init::SharedWifi;
 use crate::wifi::storage;
 use anyhow::Result;
-use esp_idf_svc::wifi::{AccessPointConfiguration, AuthMethod, ClientConfiguration, Configuration};
+use esp_idf_svc::wifi::{AuthMethod, ClientConfiguration, Configuration};
 use esp_idf_svc::nvs::EspDefaultNvsPartition;
 use serde::Deserialize;
 
 #[allow(dead_code)]
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Debug, Clone)]
 pub struct ConnectRequest {
     pub ssid: String,
     pub pass: String,
@@ -23,16 +23,7 @@ pub fn connect_to_wifi(wifi: SharedWifi, nvs: &EspDefaultNvsPartition, req: Conn
     let prev_config = current_config.clone();
     let ap_config = match current_config {
         Configuration::Mixed(_, ap) | Configuration::AccessPoint(ap) => ap,
-        _ => {
-            let ap_saved = storage::get_ap_config(nvs).unwrap_or_default();
-            let mut fallback_ap = AccessPointConfiguration::default();
-            fallback_ap.ssid = ap_saved.ssid.as_str().try_into().unwrap_or_default();
-            if ap_saved.open { fallback_ap.auth_method = AuthMethod::None; } else {
-                fallback_ap.password = ap_saved.pass.as_str().try_into().unwrap_or_default();
-                fallback_ap.auth_method = AuthMethod::WPA2Personal;
-            }
-            fallback_ap
-        }
+        _ => storage::build_ap_config(nvs),
     };
 
     let mut client_config = ClientConfiguration::default();
@@ -44,10 +35,10 @@ pub fn connect_to_wifi(wifi: SharedWifi, nvs: &EspDefaultNvsPartition, req: Conn
     else { client_config.auth_method = AuthMethod::WPA2Personal; }
     wifi_lock.set_configuration(&Configuration::Mixed(client_config, ap_config))?;
     std::thread::sleep(std::time::Duration::from_millis(150));
-    
+
     match wifi_lock.connect() {
         Ok(_) => {
-            let wifi_clone = wifi.clone(); 
+            let wifi_clone = wifi.clone();
             std::thread::spawn(move || {
                 std::thread::sleep(std::time::Duration::from_secs(5));
                 if let Ok(mut lock) = wifi_clone.lock() {

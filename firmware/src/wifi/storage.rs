@@ -1,4 +1,5 @@
 use esp_idf_svc::nvs::{EspDefaultNvsPartition, EspNvs};
+use esp_idf_svc::wifi::{AccessPointConfiguration, AuthMethod};
 use serde::{Deserialize, Serialize};
 use anyhow::Result;
 
@@ -36,7 +37,7 @@ pub fn delete_network(nvs_partition: &EspDefaultNvsPartition, ssid: &str) -> Res
     let mut nets = get_saved_networks(nvs_partition)?;
     let original_len = nets.len();
     nets.retain(|n| n.ssid != ssid);
-    
+
     if nets.len() < original_len {
         let json_str = serde_json::to_string(&nets)?;
         let nvs = EspNvs::new(nvs_partition.clone(), "wifi_data", true)?;
@@ -76,4 +77,26 @@ pub fn save_ap_config(nvs_partition: &EspDefaultNvsPartition, config: &ApConfig)
     let nvs = EspNvs::new(nvs_partition.clone(), "wifi_data", true)?;
     nvs.set_str("ap_config", &json_str)?;
     Ok(())
+}
+
+/// Construye la configuración del punto de acceso (softAP) a partir de lo
+/// guardado en NVS. Centraliza lo que antes estaba duplicado en init.rs,
+/// connection.rs y manager.rs, y además protege contra el warning
+/// "Password length is zero, but authmode threshold is 3...": si la
+/// contraseña guardada tiene menos de 8 caracteres (mínimo que exige
+/// WPA2), se cae a red abierta en vez de mandar una contraseña inválida.
+pub fn build_ap_config(nvs_partition: &EspDefaultNvsPartition) -> AccessPointConfiguration<'static> {
+    let ap_saved = get_ap_config(nvs_partition).unwrap_or_default();
+    let mut ap_config = AccessPointConfiguration::default();
+    ap_config.ssid = ap_saved.ssid.as_str().try_into().unwrap_or_default();
+    ap_config.max_connections = 4;
+
+    if ap_saved.open || ap_saved.pass.len() < 8 {
+        ap_config.auth_method = AuthMethod::None;
+    } else {
+        ap_config.password = ap_saved.pass.as_str().try_into().unwrap_or_default();
+        ap_config.auth_method = AuthMethod::WPA2Personal;
+    }
+
+    ap_config
 }

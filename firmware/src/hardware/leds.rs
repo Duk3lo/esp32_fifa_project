@@ -1,5 +1,6 @@
 use esp_idf_svc::hal::gpio::*;
 use std::sync::{Arc, Mutex};
+use crate::hardware::pins::get_any_pin;
 
 pub struct SystemLeds {
     pub green: PinDriver<'static, Output>,
@@ -9,14 +10,18 @@ pub struct SystemLeds {
 
 impl SystemLeds {
     pub fn new(g: u32, r: u32, b: u32) -> Result<Self, anyhow::Error> {
-        let p_g = unsafe { AnyIOPin::steal(g as u8) };
-        let p_r = unsafe { AnyIOPin::steal(r as u8) };
-        let p_b = unsafe { AnyIOPin::steal(b as u8) };
+        if g == r || g == b || r == b {
+            anyhow::bail!("Los pines de LED no pueden repetirse (g={g}, r={r}, b={b})");
+        }
+
+        let p_g = get_any_pin(g).ok_or_else(|| anyhow::anyhow!("Pin GPIO {g} no permitido para LED verde"))?;
+        let p_r = get_any_pin(r).ok_or_else(|| anyhow::anyhow!("Pin GPIO {r} no permitido para LED rojo"))?;
+        let p_b = get_any_pin(b).ok_or_else(|| anyhow::anyhow!("Pin GPIO {b} no permitido para LED azul"))?;
 
         let mut green = PinDriver::output(p_g)?;
         let mut red = PinDriver::output(p_r)?;
         let mut blue = PinDriver::output(p_b)?;
-        
+
         let _ = green.set_low();
         let _ = red.set_low();
         let _ = blue.set_low();

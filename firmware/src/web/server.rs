@@ -3,7 +3,9 @@ use esp_idf_svc::http::server::{Configuration, EspHttpServer};
 use esp_idf_svc::http::Method;
 use esp_idf_svc::io::Write;
 use esp_idf_svc::nvs::EspDefaultNvsPartition;
+use serde::{Deserialize, Serialize};
 use serde_json::json;
+use std::collections::HashSet;
 use std::sync::{Arc, Mutex};
 use crate::hardware::leds::SharedLeds;
 use crate::hardware::keypad::KeyEvent;
@@ -17,6 +19,56 @@ const JS_APP: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/js/app.js.gz"));
 const JS_WS: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/js/websocket.js.gz"));
 const JS_WIFI: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/js/wifi.js.gz"));
 
+#[derive(Deserialize, Serialize)]
+struct HwConfigPayload {
+    #[serde(default)]
+    led_g: u32,
+    #[serde(default)]
+    led_r: u32,
+    #[serde(default)]
+    led_b: u32,
+    #[serde(default)]
+    filas: String,
+    #[serde(default)]
+    cols: String,
+}
+
+/// Valida que todos los pines pedidos existan en la whitelist segura y que
+/// ninguno se repita entre LEDs/filas/columnas. Antes no había ninguna
+/// validación: cualquier número llegaba directo a NVS y de ahí a
+/// `AnyIOPin::steal`, sin filtro.
+fn validar_hw_config(cfg: &HwConfigPayload) -> std::result::Result<(), String> {
+    use crate::hardware::pins::is_safe_gpio;
+
+    let mut usados = HashSet::new();
+
+    for (nombre, pin) in [("led_g", cfg.led_g), ("led_r", cfg.led_r), ("led_b", cfg.led_b)] {
+        if pin == 0 { continue; } // 0 = LED no configurado (sentinel usado en main.rs)
+        if !is_safe_gpio(pin) {
+            return Err(format!("Pin {pin} ({nombre}) no es un GPIO seguro"));
+        }
+        if !usados.insert(pin) {
+            return Err(format!("El pin {pin} está asignado a más de una función"));
+        }
+    }
+
+    for (nombre, valores) in [("filas", &cfg.filas), ("cols", &cfg.cols)] {
+        for parte in valores.split(',') {
+            let parte = parte.trim();
+            if parte.is_empty() { continue; }
+            let pin: u32 = parte.parse().map_err(|_| format!("'{parte}' en {nombre} no es un número de pin válido"))?;
+            if !is_safe_gpio(pin) {
+                return Err(format!("Pin {pin} ({nombre}) no es un GPIO seguro"));
+            }
+            if !usados.insert(pin) {
+                return Err(format!("El pin {pin} está asignado a más de una función"));
+            }
+        }
+    }
+
+    Ok(())
+}
+
 pub fn start_web(
     wifi: SharedWifi,
     nvs: EspDefaultNvsPartition,
@@ -24,10 +76,10 @@ pub fn start_web(
     keypad_buf: Arc<Mutex<Vec<KeyEvent>>>,
     shared_leds: SharedLeds,
 ) -> Result<EspHttpServer<'static>> {
-    let http_config = Configuration { 
-        stack_size: 10240, 
-        max_uri_handlers: 30, 
-        ..Default::default() 
+    let http_config = Configuration {
+        stack_size: 10240,
+        max_uri_handlers: 30,
+        ..Default::default()
     };
     let mut server = EspHttpServer::new(&http_config)?;
 
@@ -63,16 +115,14 @@ pub fn start_web(
             .unwrap_or("0")
             .parse()
             .unwrap_or(0);
-            
+
         let buffer = keypad_buf.lock().unwrap();
-        
-        // Filtramos solo las teclas que son más nuevas que el ID recibido
+
         let new_keys: Vec<char> = buffer.iter()
             .filter(|k| k.id > last_id)
             .map(|k| k.key)
             .collect();
-            
-        // El último ID es el de la tecla más reciente (si no hay nuevas, devolvemos el mismo)
+
         let max_id = buffer.last().map(|k| k.id).unwrap_or(last_id);
 
         req.into_response(200, Some("OK"), &[("Content-Type", "application/json")])?
@@ -84,11 +134,36 @@ pub fn start_web(
     server.fn_handler("/api/hw/config", Method::Post, move |mut req| -> Result<()> {
         let mut buf = vec![0; 1024];
         let len = req.read(&mut buf).unwrap_or(0);
-        if let Ok(raw) = String::from_utf8(buf[..len].to_vec()) {
-            let nvs_store = esp_idf_svc::nvs::EspNvs::new(nvs_hw_post.clone(), "hw_cfg", true)?;
-            nvs_store.set_str("pins", &raw)?;
+
+        let raw = match String::from_utf8(buf[..len].to_vec()) {
+            Ok(s) => s,
+            Err(_) => {
+                req.into_response(400, Some("Bad Request"), &[("Content-Type", "application/json")])?
+                    .write_all(json!({"status": "error", "msg": "Body no es UTF-8 válido"}).to_string().as_bytes())?;
+                return Ok(());
+            }
+        };
+
+        let payload: HwConfigPayload = match serde_json::from_str(&raw) {
+            Ok(p) => p,
+            Err(_) => {
+                req.into_response(400, Some("Bad Request"), &[("Content-Type", "application/json")])?
+                    .write_all(json!({"status": "error", "msg": "JSON inválido"}).to_string().as_bytes())?;
+                return Ok(());
+            }
+        };
+
+        if let Err(msg) = validar_hw_config(&payload) {
+            req.into_response(400, Some("Bad Request"), &[("Content-Type", "application/json")])?
+                .write_all(json!({"status": "error", "msg": msg}).to_string().as_bytes())?;
+            return Ok(());
         }
-        req.into_response(200, Some("OK"), &[])?; Ok(())
+
+        let nvs_store = esp_idf_svc::nvs::EspNvs::new(nvs_hw_post.clone(), "hw_cfg", true)?;
+        nvs_store.set_str("pins", &serde_json::to_string(&payload)?)?;
+
+        req.into_response(200, Some("OK"), &[])?;
+        Ok(())
     })?;
 
     let nvs_hw_get = nvs.clone();
@@ -185,30 +260,51 @@ pub fn start_web(
     server.fn_handler("/api/connect", Method::Post, move |mut req| -> Result<()> {
         let mut buf = vec![0; 1024];
         let len = req.read(&mut buf).unwrap_or(0);
-        let raw = String::from_utf8_lossy(&buf[..len]);
-        
-        if let Ok(conn_req) = serde_json::from_str::<crate::wifi::connection::ConnectRequest>(&raw) {
-            let to_save = crate::wifi::storage::SavedNetwork {
-                ssid: conn_req.ssid.clone(),
-                pass: conn_req.pass.clone(),
-                auth_type: conn_req.auth_type.clone(),
-                user: conn_req.user.clone(),
-                anon_identity: conn_req.anon_identity.clone(),
-                eap_method: conn_req.eap_method.clone(),
-                phase2: conn_req.phase2.clone(),
-            };
-            
-            match crate::wifi::connection::connect_to_wifi(wifi_conn.clone(), &nvs_conn, conn_req) {
-                Ok(_) => {
-                    let _ = crate::wifi::storage::save_network(&nvs_conn, to_save);
-                    req.into_response(200, Some("OK"), &[("Content-Type", "application/json")])?.write_all(json!({"status": "success"}).to_string().as_bytes())?;
-                }
-                Err(e) => {
-                    req.into_response(400, Some("Bad Request"), &[("Content-Type", "application/json")])?.write_all(json!({"status": "error", "msg": e.to_string()}).to_string().as_bytes())?;
-                }
+        let raw = String::from_utf8_lossy(&buf[..len]).to_string();
+
+        let conn_req = match serde_json::from_str::<crate::wifi::connection::ConnectRequest>(&raw) {
+            Ok(r) => r,
+            Err(_) => {
+                req.into_response(400, Some("Bad Request"), &[])?;
+                return Ok(());
             }
-        } else {
-            req.into_response(400, Some("Bad Request"), &[])?;
+        };
+
+        let to_save = crate::wifi::storage::SavedNetwork {
+            ssid: conn_req.ssid.clone(),
+            pass: conn_req.pass.clone(),
+            auth_type: conn_req.auth_type.clone(),
+            user: conn_req.user.clone(),
+            anon_identity: conn_req.anon_identity.clone(),
+            eap_method: conn_req.eap_method.clone(),
+            phase2: conn_req.phase2.clone(),
+        };
+
+        // Antes esto corría directo en el hilo del servidor HTTP y podía
+        // quedarse colgado varios segundos (o más) si el driver WiFi no
+        // respondía. Ahora corre en un hilo aparte con un límite de 12s.
+        let (tx, rx) = std::sync::mpsc::channel();
+        let wifi_thread = wifi_conn.clone();
+        let nvs_thread = nvs_conn.clone();
+        std::thread::spawn(move || {
+            let result = crate::wifi::connection::connect_to_wifi(wifi_thread, &nvs_thread, conn_req);
+            let _ = tx.send(result);
+        });
+
+        match rx.recv_timeout(std::time::Duration::from_secs(12)) {
+            Ok(Ok(_)) => {
+                let _ = crate::wifi::storage::save_network(&nvs_conn, to_save);
+                req.into_response(200, Some("OK"), &[("Content-Type", "application/json")])?
+                    .write_all(json!({"status": "success"}).to_string().as_bytes())?;
+            }
+            Ok(Err(e)) => {
+                req.into_response(400, Some("Bad Request"), &[("Content-Type", "application/json")])?
+                    .write_all(json!({"status": "error", "msg": e.to_string()}).to_string().as_bytes())?;
+            }
+            Err(_) => {
+                req.into_response(504, Some("Gateway Timeout"), &[("Content-Type", "application/json")])?
+                    .write_all(json!({"status": "error", "msg": "Tiempo de espera agotado al conectar"}).to_string().as_bytes())?;
+            }
         }
         Ok(())
     })?;

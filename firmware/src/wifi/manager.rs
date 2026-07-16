@@ -1,9 +1,9 @@
 use super::init::SharedWifi;
-use super::storage::get_saved_networks;
+use super::storage::{self, get_saved_networks};
 use super::scanner;
 use super::connection;
 use esp_idf_svc::nvs::EspDefaultNvsPartition;
-use esp_idf_svc::wifi::{AccessPointConfiguration, AuthMethod, ClientConfiguration, Configuration};
+use esp_idf_svc::wifi::{ClientConfiguration, Configuration};
 use std::thread;
 use std::time::Duration;
 
@@ -11,22 +11,16 @@ pub fn start_wifi_manager(wifi: SharedWifi, nvs_partition: EspDefaultNvsPartitio
     thread::Builder::new()
         .stack_size(8192)
         .spawn(move || {
-            thread::sleep(Duration::from_secs(15)); 
-            
+            thread::sleep(Duration::from_secs(15));
+
             loop {
                 let is_connected = wifi.lock().map(|w| w.is_connected().unwrap_or(false)).unwrap_or(false);
-                
+
                 if !is_connected {
                     if let Ok(mut lock) = wifi.lock() {
                         if let Ok(config) = lock.get_configuration() {
                             if matches!(config, Configuration::Client(_)) {
-                                let ap_saved = super::storage::get_ap_config(&nvs_partition).unwrap_or_default();
-                                let mut ap_config = AccessPointConfiguration::default();
-                                ap_config.ssid = ap_saved.ssid.as_str().try_into().unwrap_or_default();
-                                if ap_saved.open { ap_config.auth_method = AuthMethod::None; } else {
-                                    ap_config.password = ap_saved.pass.as_str().try_into().unwrap_or_default();
-                                    ap_config.auth_method = AuthMethod::WPA2Personal;
-                                }
+                                let ap_config = storage::build_ap_config(&nvs_partition);
                                 let _ = lock.set_configuration(&Configuration::Mixed(ClientConfiguration::default(), ap_config));
                                 println!("Red Wi-Fi perdida. Punto de acceso habilitado de nuevo.");
                             }

@@ -5,6 +5,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::Duration;
+use crate::hardware::pins::get_any_pin;
 
 #[derive(Clone)]
 pub struct KeyEvent {
@@ -65,15 +66,6 @@ impl KeypadScanner {
     }
 }
 
-fn get_any_pin(pin_num: u32) -> Option<AnyIOPin<'static>> {
-    match pin_num {
-        0 | 2 | 4 | 5 | 12..=19 | 21..=23 | 25..=27 | 32 | 33 => {
-            Some(unsafe { AnyIOPin::steal(pin_num as u8) })
-        }
-        _ => None,
-    }
-}
-
 pub fn start_keypad_service(
     nvs_partition: EspDefaultNvsPartition,
     keypad_buf: Arc<Mutex<Vec<KeyEvent>>>,
@@ -107,13 +99,13 @@ pub fn start_keypad_service(
         let row_pins: Vec<AnyIOPin<'static>> = filas_str
             .split(',')
             .filter_map(|s| s.trim().parse::<u32>().ok())
-            .filter_map(|num| get_any_pin(num))
+            .filter_map(get_any_pin)
             .collect();
 
         let col_pins: Vec<AnyIOPin<'static>> = cols_str
             .split(',')
             .filter_map(|s| s.trim().parse::<u32>().ok())
-            .filter_map(|num| get_any_pin(num))
+            .filter_map(get_any_pin)
             .collect();
 
         if let Ok(mut scanner) = KeypadScanner::new(row_pins, col_pins) {

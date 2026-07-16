@@ -18,7 +18,7 @@ use hardware::keypad::{start_keypad_service, KeyEvent};
 fn main() {
     esp_idf_svc::sys::link_patches();
     esp_idf_svc::log::EspLogger::initialize_default();
-    
+
     let peripherals = Peripherals::take().unwrap();
     let sysloop = EspSystemEventLoop::take().expect("Error EventLoop");
     let nvs_partition = EspDefaultNvsPartition::take().expect("Error NVS");
@@ -27,11 +27,11 @@ fn main() {
     let wifi_handle = start_wifi(peripherals.modem, sysloop.clone(), nvs_partition.clone()).expect("Error WiFi");
     let _mdns = start_mdns().expect("Error mDNS");
     start_wifi_manager(wifi_handle.clone(), nvs_partition.clone());
-    
+
     let scan_state = scanner::new_scan_state();
-    
+
     // 2. Estado Compartido para Hardware
-    let keypad_buf = Arc::new(Mutex::new(Vec::<KeyEvent>::new())); // <-- Cambio a KeyEvent
+    let keypad_buf = Arc::new(Mutex::new(Vec::<KeyEvent>::new()));
     let shared_leds: SharedLeds = Arc::new(Mutex::new(None));
 
     // 3. Leer Configuración Hardware desde NVS (LEDs)
@@ -44,9 +44,14 @@ fn main() {
                 let led_b = parsed.get("led_b").and_then(|v| v.as_u64()).unwrap_or(0) as u32;
 
                 if led_g > 0 && led_r > 0 && led_b > 0 {
-                    if let Ok(leds) = SystemLeds::new(led_g, led_r, led_b) {
-                        *shared_leds.lock().unwrap() = Some(leds);
-                        log::info!("LEDs inicializados correctamente.");
+                    match SystemLeds::new(led_g, led_r, led_b) {
+                        Ok(leds) => {
+                            *shared_leds.lock().unwrap() = Some(leds);
+                            log::info!("LEDs inicializados correctamente.");
+                        }
+                        Err(e) => {
+                            log::error!("No se pudieron inicializar los LEDs con los pines configurados: {e}");
+                        }
                     }
                 }
             }
@@ -58,9 +63,9 @@ fn main() {
 
     // 5. Iniciar Servidor Web
     let _server = web::server::start_web(
-        wifi_handle.clone(), 
-        nvs_partition.clone(), 
-        scan_state, 
+        wifi_handle.clone(),
+        nvs_partition.clone(),
+        scan_state,
         keypad_buf.clone(),
         shared_leds.clone()
     ).expect("Error Servidor");
