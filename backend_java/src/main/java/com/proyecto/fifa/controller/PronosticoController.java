@@ -25,13 +25,15 @@ public class PronosticoController {
     @PostMapping
     public ResponseEntity<?> guardarPronosticoWeb(@RequestBody @NotNull PronosticoRequest req) {
         Usuario usuario = usuarioRepo.findByCodigo(req.getUsuarioCodigo());
-        if (usuario == null) {
-            return ResponseEntity.badRequest().body("Usuario no encontrado");
-        }
+        if (usuario == null) return ResponseEntity.badRequest().body("Usuario no encontrado");
+
         Partido partido = partidoRepo.findById(req.getIdPartido()).orElse(null);
-        if (partido == null) {
-            return ResponseEntity.badRequest().body("Partido no encontrado");
+        if (partido == null) return ResponseEntity.badRequest().body("Partido no encontrado");
+
+        if (pronosticoRepo.existsByUsuarioAndPartido(usuario, partido)) {
+            return ResponseEntity.badRequest().body("Ya registraste un pronóstico para este partido.");
         }
+
         Pronostico p = new Pronostico();
         p.setUsuario(usuario);
         p.setPartido(partido);

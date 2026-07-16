@@ -34,11 +34,66 @@
             <button class="nav-btn" onclick="showTab('tab-predict', this)">⚽ Pronósticos</button>
             <button class="nav-btn" onclick="showTab('tab-stats', this)">📊 Estadísticas</button>
             <button class="nav-btn" onclick="showTab('tab-hw', this)">⚙️ Hardware</button>
+            <button class="nav-btn" onclick="showTab('tab-admin', this)">⚙️ Gestión Partidos</button>
             <button class="nav-btn" onclick="showTab('tab-wifi', this)">📶 Wi-Fi</button>
         </div>
     </nav>
 
     <main class="content">
+        <div id="tab-admin" class="tab-content">
+            <div class="header-section">
+                <h1>Gestión de Partidos</h1>
+                <p>Módulo de administrador para crear partidos y definir resultados reales.</p>
+            </div>
+
+            <div class="grid-2-desktop">
+                <div class="card">
+                    <div class="card-header">
+                        <h3>Crear un nuevo partido</h3>
+                    </div>
+                    <div class="input-group">
+                        <label>Código del Partido (Ej: 2)</label>
+                        <input type="number" id="admin-id-partido" placeholder="Ej: 2">
+                    </div>
+                    <div class="grid-2">
+                        <div class="input-group">
+                            <label>ID Equipo A</label>
+                            <input type="number" id="admin-equipo-a" placeholder="Ej: 1">
+                        </div>
+                        <div class="input-group">
+                            <label>ID Equipo B</label>
+                            <input type="number" id="admin-equipo-b" placeholder="Ej: 2">
+                        </div>
+                    </div>
+                    <button class="btn-primary full-width mt-3" onclick="crearPartido()">Guardar Partido</button>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <h3>Registrar resultado final</h3>
+                    </div>
+                    <p style="font-size:13px; color:var(--text-muted); margin-bottom:15px;">Esto validará
+                        automáticamente si los usuarios acertaron o fallaron.</p>
+                    <div class="input-group">
+                        <label>Código de partido</label>
+                        <input type="number" id="res-id-partido" placeholder="Ej: 1">
+                    </div>
+                    <div class="grid-2">
+                        <div class="input-group">
+                            <label>Goles Reales Equipo A</label>
+                            <input type="number" id="res-goles-a">
+                        </div>
+                        <div class="input-group">
+                            <label>Goles Reales Equipo B</label>
+                            <input type="number" id="res-goles-b">
+                        </div>
+                    </div>
+                    <button class="btn-success full-width mt-3" onclick="guardarResultadoReal()">Guardar
+                        Resultado</button>
+                </div>
+            </div>
+        </div>
+
         <div id="tab-qr" class="tab-content active">
             <div class="header-section">
                 <h1>Ingreso al Sistema</h1>

@@ -1,6 +1,5 @@
 let appState = { connected: true };
-
-const JAVA_API_BASE = "http://localhost:8081";
+const JAVA_API_BASE = "http://localhost:8081"; // Cambiar a tu IP si usas celular
 
 window.addEventListener("load", () => {
     cargarPinesHardware();
@@ -32,30 +31,48 @@ function showTab(tabId, btnElement) {
     }
 }
 
+// --- ANIMACIONES WEB (LEDS Y TECLADO) ---
+function simularLedVirtual(color, tiempoMs) {
+    const led = document.getElementById(`v-led-${color}`);
+    if(led) {
+        led.classList.add("on");
+        setTimeout(() => led.classList.remove("on"), tiempoMs);
+    }
+}
+
+function animarTeclaVirtual(key) {
+    const botones = document.querySelectorAll('.vk-btn');
+    botones.forEach(btn => {
+        if (btn.innerText.trim() === key) {
+            btn.classList.add('pressed'); // Hace que el botón se hunda en la pantalla
+            setTimeout(() => btn.classList.remove('pressed'), 200); // Lo suelta tras 200ms
+        }
+    });
+}
+// ----------------------------------------
+
 let html5QrCode = null;
 
 function handleQrUpload(event) {
     const file = event.target.files[0];
     if (!file) return;
-    
     detenerCamara(); 
-
     const status = document.getElementById("qr-status");
     status.innerText = "Analizando imagen de la galería...";
     status.className = "status-badge waiting mt-3";
 
-    if (!html5QrCode) {
-        html5QrCode = new Html5Qrcode("reader");
-    }
+    if (!html5QrCode) html5QrCode = new Html5Qrcode("reader");
 
     html5QrCode.scanFile(file, true)
         .then(decodedText => {
             status.innerText = "Código detectado, validando...";
+            usuarioActualWeb = parseInt(decodedText);
             sendWsMessage("auth_qr", { code: decodedText });
             document.getElementById("qr-input-file").value = ""; 
         }).catch(err => {
             status.innerText = "Imagen sin QR, borrosa o inválida.";
             status.className = "status-badge error mt-3";
+            simularLedVirtual("red", 1500); // Prender LED rojo
             document.getElementById("qr-input-file").value = "";
         });
 }
@@ -67,23 +84,22 @@ function iniciarCamara() {
     status.innerText = "Iniciando cámara...";
     status.className = "status-badge waiting mt-3";
 
-    if (!html5QrCode) {
-        html5QrCode = new Html5Qrcode("reader");
-    }
+    if (!html5QrCode) html5QrCode = new Html5Qrcode("reader");
     
     html5QrCode.start(
         { facingMode: "environment" }, 
         { fps: 10, qrbox: { width: 250, height: 250 } },
         (decodedText) => {
             status.innerText = "Código detectado, validando...";
+            usuarioActualWeb = parseInt(decodedText);
             sendWsMessage("auth_qr", { code: decodedText });
             detenerCamara();
         },
-        (errorMessage) => {
-        }
+        (errorMessage) => {}
     ).catch(err => {
         status.innerText = "Error al iniciar cámara. Da permisos.";
         status.className = "status-badge error mt-3";
+        simularLedVirtual("red", 1500);
     });
 }
 
@@ -104,7 +120,6 @@ let usuarioActualWeb = 1234;
 async function enviarPronostico() {
     const codRaw = document.getElementById("partido-codigo").value;
     const cod = parseInt(codRaw.replace(/\D/g, ''));
-    
     const ga = document.getElementById("goles-a").value;
     const gb = document.getElementById("goles-b").value;
 
@@ -113,6 +128,7 @@ async function enviarPronostico() {
     document.getElementById("predict-msg").innerText = "Guardando...";
     document.getElementById("predict-msg").className = "status-badge waiting mt-3";
     
+    // Esto activa el LED Azul en el hardware
     sendWsMessage("predict", { match: cod, goalsA: ga, goalsB: gb });
 
     try {
@@ -137,11 +153,13 @@ async function enviarPronostico() {
             const errorMsg = await res.text();
             document.getElementById("predict-msg").innerText = "Error: " + errorMsg;
             document.getElementById("predict-msg").className = "status-badge error mt-3";
+            simularLedVirtual("red", 2000); // Activa el LED rojo virtual por error de duplicado o inexistente
         }
     } catch (error) {
         console.error("Error de conexión:", error);
-        document.getElementById("predict-msg").innerText = "Error de conexión con Java. Pulsa F12 y revisa la consola.";
+        document.getElementById("predict-msg").innerText = "Error de conexión con Java. Pulsa F12.";
         document.getElementById("predict-msg").className = "status-badge error mt-3";
+        simularLedVirtual("red", 2000);
     }
 }
 
@@ -183,6 +201,7 @@ async function guardarHardware() {
     } catch (e) { alert("Error al guardar"); }
 }
 
+// LECTURA CONSTANTE DEL TECLADO FÍSICO
 setInterval(async () => {
     if(!document.getElementById("partido-codigo")) return; 
     try {
@@ -194,9 +213,16 @@ setInterval(async () => {
             if (activeEl.tagName !== "INPUT") activeEl = document.getElementById("partido-codigo");
 
             data.keys.forEach(key => {
+                animarTeclaVirtual(key); // <--- HUNDE EL BOTÓN EN PANTALLA
+
                 if (key === '#') {
-                    if (activeEl.id === "partido-codigo") document.getElementById("goles-a").focus();
-                    else if (activeEl.id === "goles-a") document.getElementById("goles-b").focus();
+                    if (activeEl.id === "partido-codigo") {
+                        document.getElementById("goles-a").focus();
+                        simularLedVirtual("green", 1000); // <--- PRENDE LED VERDE EN WEB
+                    } else if (activeEl.id === "goles-a") {
+                        document.getElementById("goles-b").focus();
+                        simularLedVirtual("green", 1000); // <--- PRENDE LED VERDE EN WEB
+                    }
                 } else if (key === '*') {
                     enviarPronostico();
                 } else if (key === 'D') {
@@ -229,23 +255,10 @@ async function cargarConteoPronosticos() {
 
         chartPronosticos = new Chart(ctx, {
             type: "bar",
-            data: {
-                labels,
-                datasets: [{
-                    label: "Pronósticos registrados",
-                    data: valores,
-                    backgroundColor: "#00d2ff"
-                }]
-            },
-            options: {
-                responsive: true,
-                scales: { y: { beginAtZero: true, ticks: { precision: 0 } } },
-                plugins: { legend: { display: false } }
-            }
+            data: { labels, datasets: [{ label: "Pronósticos", data: valores, backgroundColor: "#00d2ff" }] },
+            options: { responsive: true, scales: { y: { beginAtZero: true, ticks: { precision: 0 } } }, plugins: { legend: { display: false } } }
         });
-    } catch (e) {
-        console.log("No se pudo cargar el conteo de pronósticos:", e);
-    }
+    } catch (e) {}
 }
 
 async function cargarRanking() {
@@ -258,30 +271,29 @@ async function cargarRanking() {
             tbody.innerHTML = `<tr><td colspan="4" style="text-align:center;color:var(--text-muted);">Sin pronósticos registrados</td></tr>`;
             return;
         }
-
         tbody.innerHTML = data.map(r => `
             <tr>
-                <td>${r.usuario}</td>
-                <td>${r.partido}</td>
-                <td>${r.pronostico}</td>
+                <td>${r.usuario}</td><td>${r.partido}</td><td>${r.pronostico}</td>
                 <td><span class="estado-badge estado-${r.estado.toLowerCase()}">${r.estado}</span></td>
             </tr>
         `).join("");
     } catch (e) {
-        tbody.innerHTML = `<tr><td colspan="4" style="text-align:center;color:var(--danger);">No se pudo conectar con el backend Java (revisa JAVA_API_BASE y que esté corriendo)</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="4" style="text-align:center;color:var(--danger);">Error conectando con Java</td></tr>`;
     }
 }
 
 function simularTecla(key) {
+    animarTeclaVirtual(key); // Hunde el botón cuando le haces click con el mouse
     let activeEl = document.activeElement;
-    if (activeEl.tagName !== "INPUT") {
-        activeEl = document.getElementById("partido-codigo");
-    }
+    if (activeEl.tagName !== "INPUT") activeEl = document.getElementById("partido-codigo");
+    
     if (key === '#') {
         if (activeEl.id === "partido-codigo") {
             document.getElementById("goles-a").focus();
+            simularLedVirtual("green", 1000);
         } else if (activeEl.id === "goles-a") {
             document.getElementById("goles-b").focus();
+            simularLedVirtual("green", 1000);
         }
     } else if (key === '*') {
         enviarPronostico();
@@ -292,23 +304,111 @@ function simularTecla(key) {
     }
 }
 
+// --- NUEVA LÓGICA DE VALIDACIÓN ESTRICTA ---
+async function validarYEntrar(code) {
+    const status = document.getElementById("qr-status");
+    status.innerText = "Validando en la base de datos...";
+    status.className = "status-badge waiting mt-3";
+
+    try {
+        let res = await fetch(`${JAVA_API_BASE}/api/usuarios/validar/${code}`);
+        
+        if (res.ok) {
+            usuarioActualWeb = parseInt(code);
+            status.innerText = "¡Autenticado con éxito!";
+            status.className = "status-badge success mt-3";
+            sendWsMessage("java_led_cmd", { color: "green", state: "on" });
+            simularLedVirtual("green", 1000);
+            setTimeout(() => sendWsMessage("java_led_cmd", { color: "green", state: "off" }), 1000);
+            setTimeout(() => {
+                document.getElementById("predict-form").style.opacity = "1";
+                document.getElementById("predict-form").style.pointerEvents = "auto";
+                showTab('tab-predict', document.querySelectorAll('.nav-btn')[1]);
+            }, 800);
+
+        } else {
+            status.innerText = "Error: Código de usuario no existe.";
+            status.className = "status-badge error mt-3";
+            sendWsMessage("java_led_cmd", { color: "red", state: "on" });
+            simularLedVirtual("red", 1500);
+            setTimeout(() => sendWsMessage("java_led_cmd", { color: "red", state: "off" }), 1500);
+        }
+    } catch (error) {
+        status.innerText = "Error conectando con Java.";
+        status.className = "status-badge error mt-3";
+        simularLedVirtual("red", 1500);
+    }
+}
+
 function ingresoManual() {
-    const code = document.getElementById("manual-code-input").value;
+    const code = document.getElementById("manual-code-input").value.trim(); 
     if (!code) {
         alert("Por favor ingresa un código válido.");
         return;
     }
-    const status = document.getElementById("qr-status");
-    status.innerText = "Validando código manual...";
-    status.className = "status-badge waiting mt-3";
-    usuarioActualWeb = parseInt(code);
-    sendWsMessage("auth_qr", { code: code });
     document.getElementById("manual-code-input").value = "";
+    validarYEntrar(code);
 }
+
+function onScanSuccess(decodedText, decodedResult) {
+    html5QrcodeScanner.clear();
+    validarYEntrar(decodedText);
+}
+// ------------------------------------------
 
 function onScanSuccess(decodedText, decodedResult) {
     document.getElementById("qr-status").innerText = "Validando código...";
     usuarioActualWeb = parseInt(decodedText);
     sendWsMessage("auth_qr", { code: decodedText });
     html5QrcodeScanner.clear();
+}
+
+async function crearPartido() {
+    const id = document.getElementById("admin-id-partido").value;
+    const eqA = document.getElementById("admin-equipo-a").value;
+    const eqB = document.getElementById("admin-equipo-b").value;
+    
+    if (!id || !eqA || !eqB) return alert("Completa todos los campos");
+
+    await fetch(`${JAVA_API_BASE}/api/partidos`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+            idPartido: parseInt(id),
+            idEquipoA: parseInt(eqA),
+            idEquipoB: parseInt(eqB),
+            fecha: new Date().toISOString().split('T')[0],
+            hora: "12:00:00"
+        })
+    });
+    alert("¡Partido creado correctamente!");
+    document.getElementById("admin-id-partido").value = "";
+    document.getElementById("admin-equipo-a").value = "";
+    document.getElementById("admin-equipo-b").value = "";
+}
+
+async function guardarResultadoReal() {
+    const id = document.getElementById("res-id-partido").value;
+    const ga = document.getElementById("res-goles-a").value;
+    const gb = document.getElementById("res-goles-b").value;
+
+    if (!id || !ga || !gb) return alert("Completa todos los campos");
+
+    let res = await fetch(`${JAVA_API_BASE}/api/partidos/${id}/resultado`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+            golesEquipoA: parseInt(ga),
+            golesEquipoB: parseInt(gb)
+        })
+    });
+    
+    if (res.ok) {
+        alert("Resultado real guardado. Las estadísticas se han actualizado.");
+        document.getElementById("res-id-partido").value = "";
+        document.getElementById("res-goles-a").value = "";
+        document.getElementById("res-goles-b").value = "";
+    } else {
+        alert("Error: Partido no encontrado.");
+    }
 }

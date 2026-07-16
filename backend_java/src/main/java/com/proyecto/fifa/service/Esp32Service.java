@@ -121,6 +121,12 @@ public class Esp32Service {
                 }
                 case GOLES_B -> {
                     if (tecla.equals("*")) {
+                        if (pronosticoRepo.existsByUsuarioAndPartido(usuarioActual, partidoActual)) {
+                            enviarLed("red");
+                            estadoActual = Estado.LOGIN;
+                            return;
+                        }
+
                         int golesB = Integer.parseInt(input);
 
                         Pronostico p = new Pronostico();
