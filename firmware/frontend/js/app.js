@@ -354,7 +354,6 @@ function onScanSuccess(decodedText, decodedResult) {
     html5QrcodeScanner.clear();
     validarYEntrar(decodedText);
 }
-// ------------------------------------------
 
 function onScanSuccess(decodedText, decodedResult) {
     document.getElementById("qr-status").innerText = "Validando código...";
