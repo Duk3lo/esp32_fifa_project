@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FIFA 2026 - Pronósticos</title>
+    <link rel="stylesheet" href="./css/style.css">
+    <script src="https://unpkg.com/html5-qrcode"></script>
+</head>
+<body>
+    <nav class="sidebar">
+        <div class="logo"><h2>FIFA <span>2026</span></h2></div>
+        <div class="led-panel">
+            <p style="font-size: 12px; color: #a4b0be; margin-bottom: 8px; text-align: center;">Estado Hardware</p>
+            <div class="led-container">
+                <div class="led-box"><div class="led led-green" id="v-led-green"></div></div>
+                <div class="led-box"><div class="led led-red" id="v-led-red"></div></div>
+                <div class="led-box"><div class="led led-blue" id="v-led-blue"></div></div>
+            </div>
+        </div>
+        <div class="nav-links">
+            <button class="nav-btn active" onclick="showTab('tab-qr', this)">📱 Lector QR</button>
+            <button class="nav-btn" onclick="showTab('tab-predict', this)">⚽ Pronósticos</button>
+            <button class="nav-btn" onclick="showTab('tab-stats', this)">📊 Estadísticas</button>
+            <button class="nav-btn" onclick="showTab('tab-hw', this)">⚙️ Hardware</button>
+            <button class="nav-btn" onclick="showTab('tab-wifi', this)">📶 Wi-Fi</button>
+        </div>
+    </nav>
+
+    <main class="content">
+        <div id="tab-qr" class="tab-content active">
+            <div class="header-section">
+                <h1>Ingreso al Sistema</h1>
+                <p>Escanea tu código QR o sube una imagen de tu galería.</p>
+            </div>
+            
+            <div class="card scanner-card" style="text-align: center;">
+                <div id="reader" style="width: 100%; max-width: 350px; margin: 0 auto; display: none; border-radius: 12px; overflow: hidden; margin-bottom: 15px;"></div>
+                <div class="flex-gap" style="justify-content: center; align-items: center;">
+                    <button class="btn-primary flex-1" onclick="iniciarCamara()">📷 Usar Cámara</button>
+                    <label for="qr-input-file" class="btn-primary flex-1" style="cursor:pointer; padding: 12px; border-radius: 8px; margin: 0; text-align: center; display: inline-block;">📂 Abrir Galería</label>
+                    <input type="file" id="qr-input-file" accept="image/*" style="display: none;" onchange="handleQrUpload(event)">
+                </div>
+                <button class="btn-cancel mt-3" id="btn-stop-cam" style="display: none; width: 100%;" onclick="detenerCamara()">🛑 Detener Cámara</button>
+                
+                <div id="qr-status" class="status-badge waiting mt-3">Esperando QR...</div>
+            </div>
+        </div>
+
+        <div id="tab-predict" class="tab-content">
+            <div class="header-section">
+                <h1>Registrar Pronóstico</h1>
+                <p>Usa esta web o el <b>teclado matricial físico</b>. Los datos se sincronizan en vivo.</p>
+            </div>
+            <div class="card" id="predict-form" style="opacity: 0.4; pointer-events: none;">
+                <div class="input-group">
+                    <label>Código del Partido (Físico: presiona # al terminar)</label>
+                    <input type="text" id="partido-codigo" placeholder="Ej: P001">
+                </div>
+                <div class="grid-2">
+                    <div class="input-group">
+                        <label>Goles Equipo A (Físico: presiona #)</label>
+                        <input type="number" id="goles-a" min="0" placeholder="0">
+                    </div>
+                    <div class="input-group">
+                        <label>Goles Equipo B (Físico: presiona *)</label>
+                        <input type="number" id="goles-b" min="0" placeholder="0">
+                    </div>
+                </div>
+                <button class="btn-success full-width mt-3" onclick="enviarPronostico()">Guardar Pronóstico</button>
+                <p id="predict-msg" class="status-msg mt-3"></p>
+            </div>
+        </div>
+
+        <div id="tab-stats" class="tab-content">
+            <div class="header-section"><h1>Ranking</h1></div>
+            <div class="card"><p>Aquí irá la tabla de resultados...</p></div>
+        </div>
+
+        <div id="tab-hw" class="tab-content">
+            <div class="header-section">
+                <h1>Configuración de Pines (GPIO)</h1>
+                <p>Asigna los pines de la ESP32. Requiere reiniciar para aplicar cambios.</p>
+            </div>
+            <div class="card">
+                <h3 class="mb-3">Indicadores LED</h3>
+                <div class="grid-2">
+                    <div class="input-group"><label>Pin LED Verde</label><input type="number" id="pin-led-g"></div>
+                    <div class="input-group"><label>Pin LED Rojo</label><input type="number" id="pin-led-r"></div>
+                    <div class="input-group"><label>Pin LED Azul</label><input type="number" id="pin-led-b"></div>
+                </div>
+                <h3 class="mb-3 mt-3">Teclado Matricial</h3>
+                <div class="grid-2">
+                    <div class="input-group"><label>Filas (Ej: 19,18,5,17)</label><input type="text" id="pin-filas"></div>
+                    <div class="input-group"><label>Columnas (Ej: 16,4,2,15)</label><input type="text" id="pin-cols"></div>
+                </div>
+                <div class="flex-gap mt-3">
+                    <button class="btn-primary flex-1" onclick="guardarHardware()">💾 Guardar y Reiniciar</button>
+                </div>
+                <p id="hw-status" class="status-msg mt-3"></p>
+            </div>
+        </div>
+
+        <div id="tab-wifi" class="tab-content">
+            <div class="header-section">
+                <h1>Estado de Red</h1>
+            </div>
+            <div class="grid-2-desktop mt-3">
+                <div class="card">
+                    <div class="card-header">
+                        <h3>Redes disponibles</h3>
+                        <button class="btn-small" id="wifi-scan-btn" onclick="WifiUI.scan()">🔄 Buscar</button>
+                    </div>
+                    <ul id="wifi-scan-list" class="network-list">
+                        <li class="network-empty">Presiona "Buscar" para escanear</li>
+                    </ul>
+                </div>
+                <div class="card">
+                    <h3 class="mb-2" style="border-bottom: 1px solid var(--border); padding-bottom: 10px;">Redes Guardadas</h3>
+                    <ul id="wifi-saved-list" class="network-list mb-3">
+                        <li class="network-empty">Cargando redes...</li>
+                    </ul>
+                    <p id="wifi-status" class="status-msg text-center"></p>
+                    
+                    <div class="card-header mt-4"><h3>Punto de Acceso (AP)</h3></div>
+                    <p class="offline-warning mt-2" style="color: #00e676; border-color: rgba(0,230,118,0.3); background: rgba(0,230,118,0.1);">
+                        El AP está desactivado. El dispositivo ya tiene Internet y los WebSockets están funcionales.
+                    </p>
+                    <div class="mt-3">
+                        <button class="btn-cancel full-width" onclick="WifiUI.olvidarActual()">Desconectar ESP32 de la red actual</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+    <div id="wifi-connect-modal" class="modal-overlay" style="display:none;">
+        <div class="modal-box">
+            <h3 id="wifi-modal-ssid" class="mb-3">Conectar a...</h3>
+            <div class="input-group">
+                <label id="wifi-modal-pass-label">Contraseña</label>
+                <input type="password" id="wifi-modal-pass" placeholder="Mínimo 8 caracteres">
+            </div>
+            <div class="flex-gap mt-3">
+                <button class="btn-success flex-1" id="btn-conectar" onclick="WifiUI.confirmConnect()">Conectar</button>
+                <button class="btn-cancel flex-1" onclick="WifiUI.closeModal()">Cancelar</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="./js/websocket.js"></script>
+    <script src="./js/wifi.js"></script>
+    <script src="./js/app.js"></script>
+</body>
+</html>

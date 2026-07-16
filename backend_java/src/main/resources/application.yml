@@ -1,0 +1,13 @@
+spring:
+  datasource:
+    url: jdbc:mysql://localhost:3306/pronosticosMundial
+    username: dukelo
+    password: Jhosue2004!
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+
+esp32:
+  url: "http://esp32.local"
+  ws: "ws://esp32.local/ws"

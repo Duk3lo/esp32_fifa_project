@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Configuración Wi-Fi - ESP32</title>
+    <link rel="stylesheet" href="./css/style.css">
+</head>
+<body>
+    <div class="content" style="max-width: 800px; margin: 0 auto; padding-top: 5vh;">
+        <div class="header-section text-center" style="text-align: center; margin-bottom: 40px;">
+            <h1 style="color: var(--primary); font-size: 32px;">⚙️ Modo Configuración</h1>
+            <p style="font-size: 16px;">El dispositivo no está conectado a Internet.<br>Selecciona una red para habilitar el sistema FIFA 2026.</p>
+        </div>
+
+        <div class="grid-2-desktop mt-3">
+            <div class="card">
+                <div class="card-header">
+                    <h3>Redes disponibles</h3>
+                    <button class="btn-small" id="wifi-scan-btn" onclick="WifiUI.scan()">🔄 Buscar</button>
+                </div>
+                <ul id="wifi-scan-list" class="network-list">
+                    <li class="network-empty">Presiona "Buscar" para escanear</li>
+                </ul>
+            </div>
+            <div class="card">
+                <h3 class="mb-2" style="border-bottom: 1px solid var(--border); padding-bottom: 10px;">Redes Guardadas</h3>
+                <ul id="wifi-saved-list" class="network-list mb-3">
+                    <li class="network-empty">Cargando redes...</li>
+                </ul>
+                <p id="wifi-status" class="status-msg text-center"></p>
+            </div>
+        </div>
+    </div>
+
+    <div id="wifi-connect-modal" class="modal-overlay" style="display:none;">
+        <div class="modal-box">
+            <h3 id="wifi-modal-ssid" class="mb-3">Conectar a...</h3>
+            <div class="input-group">
+                <label id="wifi-modal-pass-label">Contraseña</label>
+                <input type="password" id="wifi-modal-pass" placeholder="Mínimo 8 caracteres">
+            </div>
+            <div class="flex-gap mt-3">
+                <button class="btn-success flex-1" id="btn-conectar" onclick="WifiUI.confirmConnect()">Conectar</button>
+                <button class="btn-cancel flex-1" onclick="WifiUI.closeModal()">Cancelar</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="./js/wifi.js"></script>
+    <script>
+        window.addEventListener("load", () => {
+            WifiUI.loadSaved();
+            setInterval(async () => {
+                try {
+                    let res = await fetch("/api/status");
+                    let data = await res.json();
+                    if (data.connected) {
+                        document.querySelector(".header-section p").innerHTML = "<span style='color:#00e676;font-weight:bold;'>¡Conectado! Redirigiendo al sistema...</span>";
+                        setTimeout(() => window.location.href = "/", 1000);
+                    }
+                } catch (e) {}
+            }, 3000);
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,73 @@
+### ========================================== ###
+### 🌍 SISTEMA OPERATIVO Y GENERAL             ###
+### ========================================== ###
+.DS_Store
+Thumbs.db
+*.log
+.env
+.env.*
+
+### ========================================== ###
+### 🛠️ ENTORNOS DE DESARROLLO (IDEs)           ###
+### ========================================== ###
+
+# VS Code
+.vscode/
+
+# IntelliJ IDEA
+.idea/
+*.iws
+*.iml
+*.ipr
+out/
+!**/src/main/**/out/
+!**/src/test/**/out/
+
+# Eclipse
+.apt_generated
+.classpath
+.factorypath
+.project
+.settings
+.springBeans
+.sts4-cache
+bin/
+!**/src/main/**/bin/
+!**/src/test/**/bin/
+
+# NetBeans
+nbproject/private/
+nbbuild/
+dist/
+nbdist/
+.nb-gradle/
+
+### ========================================== ###
+### 🦀 FIRMWARE (RUST / ESP32)                 ###
+### ========================================== ###
+
+# Ignora las carpetas de compilación de Rust (incluyendo la que tienes en la raíz y en firmware)
+target/
+
+# Ignora los binarios generados por el framework ESP-IDF
+.embuild/
+
+# Nota: En proyectos de Rust tipo "binario" (como firmware), 
+# SE RECOMIENDA subir el Cargo.lock al repositorio. 
+# Si de todas formas quieres ignorarlo, descomenta la siguiente línea:
+# firmware/Cargo.lock
+
+### ========================================== ###
+### ☕ BACKEND (JAVA / GRADLE)                 ###
+### ========================================== ###
+
+.gradle/
+build/
+.kotlin/
+
+# Mantener el Wrapper de Gradle (Buena práctica para que otros no tengan que instalar Gradle)
+!gradle/wrapper/gradle-wrapper.jar
+
+# Excepciones para no ignorar carpetas llamadas "build" dentro del código fuente
+!**/src/main/**/build/
+!**/src/test/**/build/
