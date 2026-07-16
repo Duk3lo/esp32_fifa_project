@@ -1,6 +1,6 @@
 let appState = { connected: true };
 
-const JAVA_API_BASE = "http://fifa-backend.local:8081";
+const JAVA_API_BASE = "http://localhost:8081";
 
 window.addEventListener("load", () => {
     cargarPinesHardware();
@@ -99,15 +99,50 @@ function detenerCamara() {
     }
 }
 
-function enviarPronostico() {
-    const cod = document.getElementById("partido-codigo").value;
+let usuarioActualWeb = 1234;
+
+async function enviarPronostico() {
+    const codRaw = document.getElementById("partido-codigo").value;
+    const cod = parseInt(codRaw.replace(/\D/g, ''));
+    
     const ga = document.getElementById("goles-a").value;
     const gb = document.getElementById("goles-b").value;
 
     if (!cod || !ga || !gb) { alert("Completa todos los campos"); return; }
+    
     document.getElementById("predict-msg").innerText = "Guardando...";
     document.getElementById("predict-msg").className = "status-badge waiting mt-3";
+    
     sendWsMessage("predict", { match: cod, goalsA: ga, goalsB: gb });
+
+    try {
+        let res = await fetch(`${JAVA_API_BASE}/api/pronosticos`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                idPartido: cod,
+                golesA: parseInt(ga),
+                golesB: parseInt(gb),
+                usuarioCodigo: usuarioActualWeb
+            })
+        });
+
+        if (res.ok) {
+            document.getElementById("predict-msg").innerText = "¡Pronóstico Guardado en la Base de Datos!";
+            document.getElementById("predict-msg").className = "status-badge success mt-3";
+            document.getElementById("partido-codigo").value = "";
+            document.getElementById("goles-a").value = "";
+            document.getElementById("goles-b").value = "";
+        } else {
+            const errorMsg = await res.text();
+            document.getElementById("predict-msg").innerText = "Error: " + errorMsg;
+            document.getElementById("predict-msg").className = "status-badge error mt-3";
+        }
+    } catch (error) {
+        console.error("Error de conexión:", error);
+        document.getElementById("predict-msg").innerText = "Error de conexión con Java. Pulsa F12 y revisa la consola.";
+        document.getElementById("predict-msg").className = "status-badge error mt-3";
+    }
 }
 
 function sendWsMessage(type, payload) {
@@ -235,4 +270,45 @@ async function cargarRanking() {
     } catch (e) {
         tbody.innerHTML = `<tr><td colspan="4" style="text-align:center;color:var(--danger);">No se pudo conectar con el backend Java (revisa JAVA_API_BASE y que esté corriendo)</td></tr>`;
     }
+}
+
+function simularTecla(key) {
+    let activeEl = document.activeElement;
+    if (activeEl.tagName !== "INPUT") {
+        activeEl = document.getElementById("partido-codigo");
+    }
+    if (key === '#') {
+        if (activeEl.id === "partido-codigo") {
+            document.getElementById("goles-a").focus();
+        } else if (activeEl.id === "goles-a") {
+            document.getElementById("goles-b").focus();
+        }
+    } else if (key === '*') {
+        enviarPronostico();
+    } else if (key === 'D') {
+        activeEl.value = activeEl.value.slice(0, -1);
+    } else {
+        activeEl.value += key;
+    }
+}
+
+function ingresoManual() {
+    const code = document.getElementById("manual-code-input").value;
+    if (!code) {
+        alert("Por favor ingresa un código válido.");
+        return;
+    }
+    const status = document.getElementById("qr-status");
+    status.innerText = "Validando código manual...";
+    status.className = "status-badge waiting mt-3";
+    usuarioActualWeb = parseInt(code);
+    sendWsMessage("auth_qr", { code: code });
+    document.getElementById("manual-code-input").value = "";
+}
+
+function onScanSuccess(decodedText, decodedResult) {
+    document.getElementById("qr-status").innerText = "Validando código...";
+    usuarioActualWeb = parseInt(decodedText);
+    sendWsMessage("auth_qr", { code: decodedText });
+    html5QrcodeScanner.clear();
 }

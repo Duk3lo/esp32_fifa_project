@@ -36,6 +36,9 @@ dependencies {
     // Testing
     testImplementation("org.springframework.boot:spring-boot-starter-test")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
+
+    // Anotaciones de JetBrains
+    compileOnly("org.jetbrains:annotations:24.1.0")
 }
 
 tasks.withType<Test> {

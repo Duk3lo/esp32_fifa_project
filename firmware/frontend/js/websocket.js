@@ -18,6 +18,7 @@ function connectWebSocket() {
             document.getElementById("qr-status").className = "status-badge success";
             document.getElementById("predict-form").style.opacity = "1";
             document.getElementById("predict-form").style.pointerEvents = "auto";
+            showTab('tab-predict', document.querySelectorAll('.nav-btn')[1]);
         } else if (data.type === "auth_error") {
             document.getElementById("qr-status").innerText = "Error: QR Inválido o usuario no existe.";
             document.getElementById("qr-status").className = "status-badge error";

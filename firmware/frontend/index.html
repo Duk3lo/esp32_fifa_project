@@ -7,7 +7,7 @@
     <title>FIFA 2026 - Pronósticos</title>
     <link rel="stylesheet" href="./css/style.css">
     <script src="https://unpkg.com/html5-qrcode"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 
 <body>
@@ -59,9 +59,20 @@
                 </div>
                 <button class="btn-cancel mt-3" id="btn-stop-cam" style="display: none; width: 100%;"
                     onclick="detenerCamara()">🛑 Detener Cámara</button>
-
                 <div id="qr-status" class="status-badge waiting mt-3">Esperando QR...</div>
+                <div style="margin-top: 30px; border-top: 1px solid var(--border); padding-top: 20px;">
+                    <p style="margin-bottom: 15px; color: var(--text-muted); font-size: 14px;">
+                        ¿No puedes usar la cámara? Ingresa tu código numérico aquí:
+                    </p>
+                    <div class="flex-gap" style="justify-content: center; align-items: center;">
+                        <input type="password" id="manual-code-input" placeholder="Ej: 1234"
+                            style="max-width: 200px; text-align: center; letter-spacing: 5px;">
+                        <button class="btn-success" onclick="ingresoManual()">Entrar</button>
+                    </div>
+                </div>
             </div>
+        </div>
+        </div>
         </div>
 
         <div id="tab-predict" class="tab-content">
@@ -71,19 +82,19 @@
             </div>
 
             <div class="grid-2-desktop">
-                <div class="card" id="predict-form" style="opacity: 0.4; pointer-events: none;">
+                <div class="card" id="predict-form">
                     <div class="input-group">
                         <label>Código del Partido (Físico: presiona #)</label>
-                        <input type="text" id="partido-codigo" placeholder="Ej: P001" readonly>
+                        <input type="text" id="partido-codigo" placeholder="Ej: P001">
                     </div>
                     <div class="grid-2">
                         <div class="input-group">
                             <label>Goles Equipo A</label>
-                            <input type="number" id="goles-a" min="0" placeholder="0" readonly>
+                            <input type="number" id="goles-a" min="0" placeholder="0">
                         </div>
                         <div class="input-group">
                             <label>Goles Equipo B (Terminar con *)</label>
-                            <input type="number" id="goles-b" min="0" placeholder="0" readonly>
+                            <input type="number" id="goles-b" min="0" placeholder="0">
                         </div>
                     </div>
                     <button class="btn-success full-width mt-3" onclick="enviarPronostico()">Guardar Pronóstico</button>
