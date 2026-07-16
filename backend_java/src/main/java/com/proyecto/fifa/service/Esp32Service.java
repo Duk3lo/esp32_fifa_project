@@ -46,6 +46,7 @@ public class Esp32Service {
         this.pronosticoRepo = pr;
     }
 
+    @Nonnull
     private static RestTemplate buildRestTemplate() {
         // Sin timeouts, si el ESP32 deja de responder (sin llegar a rechazar
         // la conexión) el hilo del scheduler se bloquea indefinidamente y

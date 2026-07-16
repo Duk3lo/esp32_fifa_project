@@ -79,13 +79,7 @@ pub fn save_ap_config(nvs_partition: &EspDefaultNvsPartition, config: &ApConfig)
     Ok(())
 }
 
-/// Construye la configuración del punto de acceso (softAP) a partir de lo
-/// guardado en NVS. Centraliza lo que antes estaba duplicado en init.rs,
-/// connection.rs y manager.rs, y además protege contra el warning
-/// "Password length is zero, but authmode threshold is 3...": si la
-/// contraseña guardada tiene menos de 8 caracteres (mínimo que exige
-/// WPA2), se cae a red abierta en vez de mandar una contraseña inválida.
-pub fn build_ap_config(nvs_partition: &EspDefaultNvsPartition) -> AccessPointConfiguration<'static> {
+pub fn build_ap_config(nvs_partition: &EspDefaultNvsPartition) -> AccessPointConfiguration {
     let ap_saved = get_ap_config(nvs_partition).unwrap_or_default();
     let mut ap_config = AccessPointConfiguration::default();
     ap_config.ssid = ap_saved.ssid.as_str().try_into().unwrap_or_default();

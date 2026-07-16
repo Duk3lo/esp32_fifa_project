@@ -33,10 +33,6 @@ struct HwConfigPayload {
     cols: String,
 }
 
-/// Valida que todos los pines pedidos existan en la whitelist segura y que
-/// ninguno se repita entre LEDs/filas/columnas. Antes no había ninguna
-/// validación: cualquier número llegaba directo a NVS y de ahí a
-/// `AnyIOPin::steal`, sin filtro.
 fn validar_hw_config(cfg: &HwConfigPayload) -> std::result::Result<(), String> {
     use crate::hardware::pins::is_safe_gpio;
 
@@ -280,9 +276,7 @@ pub fn start_web(
             phase2: conn_req.phase2.clone(),
         };
 
-        // Antes esto corría directo en el hilo del servidor HTTP y podía
-        // quedarse colgado varios segundos (o más) si el driver WiFi no
-        // respondía. Ahora corre en un hilo aparte con un límite de 12s.
+
         let (tx, rx) = std::sync::mpsc::channel();
         let wifi_thread = wifi_conn.clone();
         let nvs_thread = nvs_conn.clone();
