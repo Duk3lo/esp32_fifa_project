@@ -39,7 +39,7 @@ fn validar_hw_config(cfg: &HwConfigPayload) -> std::result::Result<(), String> {
     let mut usados = HashSet::new();
 
     for (nombre, pin) in [("led_g", cfg.led_g), ("led_r", cfg.led_r), ("led_b", cfg.led_b)] {
-        if pin == 0 { continue; } // 0 = LED no configurado (sentinel usado en main.rs)
+        if pin == 0 { continue; }
         if !is_safe_gpio(pin) {
             return Err(format!("Pin {pin} ({nombre}) no es un GPIO seguro"));
         }

@@ -43,7 +43,7 @@
         <div id="tab-admin" class="tab-content">
             <div class="header-section">
                 <h1>Gestión de Partidos</h1>
-                <p>Módulo de administrador para crear partidos y definir resultados reales.</p>
+                <p>Crear partidos, definir resultados y administrar el historial.</p>
             </div>
 
             <div class="grid-2-desktop">
@@ -57,15 +57,24 @@
                     </div>
                     <div class="grid-2">
                         <div class="input-group">
-                            <label>ID Equipo A</label>
-                            <input type="number" id="admin-equipo-a" placeholder="Ej: 1">
+                            <label>Equipo A</label>
+                            <select id="admin-equipo-a">
+                                <option value="">Cargando equipos...</option>
+                            </select>
                         </div>
                         <div class="input-group">
-                            <label>ID Equipo B</label>
-                            <input type="number" id="admin-equipo-b" placeholder="Ej: 2">
+                            <label>Equipo B</label>
+                            <select id="admin-equipo-b">
+                                <option value="">Cargando equipos...</option>
+                            </select>
                         </div>
                     </div>
+                    <div class="grid-2">
+                        <div class="input-group"><label>Fecha</label><input type="date" id="admin-fecha-partido"></div>
+                        <div class="input-group"><label>Hora</label><input type="time" id="admin-hora-partido"></div>
+                    </div>
                     <button class="btn-primary full-width mt-3" onclick="crearPartido()">Guardar Partido</button>
+                    <p id="crear-partido-msg" class="status-msg mt-3"></p>
                 </div>
 
                 <div class="card">
@@ -75,22 +84,44 @@
                     <p style="font-size:13px; color:var(--text-muted); margin-bottom:15px;">Esto validará
                         automáticamente si los usuarios acertaron o fallaron.</p>
                     <div class="input-group">
-                        <label>Código de partido</label>
-                        <input type="number" id="res-id-partido" placeholder="Ej: 1">
+                        <label>Partido</label>
+                        <select id="res-id-partido">
+                            <option value="">Cargando partidos...</option>
+                        </select>
                     </div>
                     <div class="grid-2">
-                        <div class="input-group">
-                            <label>Goles Reales Equipo A</label>
-                            <input type="number" id="res-goles-a">
-                        </div>
-                        <div class="input-group">
-                            <label>Goles Reales Equipo B</label>
-                            <input type="number" id="res-goles-b">
-                        </div>
+                        <div class="input-group"><label>Goles Reales Equipo A</label><input type="number"
+                                id="res-goles-a" min="0"></div>
+                        <div class="input-group"><label>Goles Reales Equipo B</label><input type="number"
+                                id="res-goles-b" min="0"></div>
                     </div>
                     <button class="btn-success full-width mt-3" onclick="guardarResultadoReal()">Guardar
                         Resultado</button>
+                    <p id="resultado-msg" class="status-msg mt-3"></p>
                 </div>
+            </div>
+
+            <div class="card mt-3">
+                <div class="card-header">
+                    <h3>Partidos Registrados</h3>
+                    <button class="btn-small" onclick="cargarPartidosAdmin()">🔄 Actualizar</button>
+                </div>
+                <table class="report-table" id="tabla-partidos-admin">
+                    <thead>
+                        <tr>
+                            <th>Código</th>
+                            <th>Partido</th>
+                            <th>Fecha</th>
+                            <th>Resultado</th>
+                            <th>Acción</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td colspan="5" style="text-align:center;color:var(--text-muted);">Cargando...</td>
+                        </tr>
+                    </tbody>
+                </table>
             </div>
         </div>
 
