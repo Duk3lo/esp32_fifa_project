@@ -16,7 +16,7 @@
             <h2>FIFA <span>2026</span></h2>
         </div>
         <div class="led-panel">
-            <p style="font-size: 12px; color: #a4b0be; margin-bottom: 8px; text-align: center;">Estado Hardware</p>
+            <p style="font-size: 12px; color: #a4b0be; text-align: center;">Estado Hardware</p>
             <div class="led-container">
                 <div class="led-box">
                     <div class="led led-green" id="v-led-green"></div>
@@ -27,15 +27,24 @@
                 <div class="led-box">
                     <div class="led led-blue" id="v-led-blue"></div>
                 </div>
+                <div class="led-box">
+                    <div class="led led-orange" id="v-led-orange"></div>
+                </div> <!-- NUEVO LED -->
             </div>
         </div>
         <div class="nav-links">
+            <p style="color:#666; font-size:11px; margin-left:15px; margin-bottom:5px;">Menú principal</p>
+            <button class="nav-btn" onclick="showTab('tab-admin', this)">⚙️ Gestión de partidos</button>
+            <button class="nav-btn" onclick="showTab('tab-res', this)">⚽ Resultados</button>
+            <button class="nav-btn" onclick="showTab('tab-stats', this)">📊 Reportería</button>
+            <button class="nav-btn" onclick="showTab('tab-datos', this)">🗂️ Gestión Datos (BD)</button>
+
+            <p style="color:#666; font-size:11px; margin-left:15px; margin-top:20px; margin-bottom:5px;">
+                Hardware/Usuario</p>
             <button class="nav-btn active" onclick="showTab('tab-qr', this)">📱 Lector QR</button>
-            <button class="nav-btn" onclick="showTab('tab-predict', this)">⚽ Pronósticos</button>
-            <button class="nav-btn" onclick="showTab('tab-stats', this)">📊 Estadísticas</button>
-            <button class="nav-btn" onclick="showTab('tab-hw', this)">⚙️ Hardware</button>
-            <button class="nav-btn" onclick="showTab('tab-admin', this)">⚙️ Gestión Partidos</button>
-            <button class="nav-btn" onclick="showTab('tab-wifi', this)">📶 Wi-Fi</button>
+            <button class="nav-btn" onclick="showTab('tab-predict', this)">🎲 Pronósticos</button>
+            <button class="nav-btn" onclick="showTab('tab-hw', this)">⚙️ Config Hardware</button>
+            <button class="nav-btn" onclick="showTab('tab-wifi', this)">🌐 Red / WiFi</button>
         </div>
     </nav>
 
@@ -43,61 +52,43 @@
         <div id="tab-admin" class="tab-content">
             <div class="header-section">
                 <h1>Gestión de Partidos</h1>
-                <p>Crear partidos, definir resultados y administrar el historial.</p>
             </div>
 
             <div class="grid-2-desktop">
                 <div class="card">
                     <div class="card-header">
-                        <h3>Crear un nuevo partido</h3>
-                    </div>
-                    <div class="input-group">
-                        <label>Código del Partido (Ej: 2)</label>
-                        <input type="number" id="admin-id-partido" placeholder="Ej: 2">
+                        <h3>Registro de un nuevo partido</h3>
                     </div>
                     <div class="grid-2">
-                        <div class="input-group">
-                            <label>Equipo A</label>
-                            <select id="admin-equipo-a">
-                                <option value="">Cargando equipos...</option>
-                            </select>
-                        </div>
-                        <div class="input-group">
-                            <label>Equipo B</label>
-                            <select id="admin-equipo-b">
-                                <option value="">Cargando equipos...</option>
-                            </select>
-                        </div>
+                        <div class="input-group"><label>Código partido:</label><input type="number"
+                                id="admin-id-partido"></div>
+                        <div class="input-group"><label>Equipo A:</label><select id="admin-equipo-a"></select></div>
                     </div>
                     <div class="grid-2">
-                        <div class="input-group"><label>Fecha</label><input type="date" id="admin-fecha-partido"></div>
-                        <div class="input-group"><label>Hora</label><input type="time" id="admin-hora-partido"></div>
+                        <div class="input-group"><label>Fecha:</label><input type="date" id="admin-fecha-partido"></div>
+                        <div class="input-group"><label>Equipo B:</label><select id="admin-equipo-b"></select></div>
                     </div>
-                    <button class="btn-primary full-width mt-3" onclick="crearPartido()">Guardar Partido</button>
-                    <p id="crear-partido-msg" class="status-msg mt-3"></p>
+                    <div class="input-group mt-2"><label>Hora:</label><input type="time" id="admin-hora-partido"></div>
+                    <button class="btn-primary mt-3" style="margin: 0 auto; display: block;"
+                        onclick="crearPartido()">Guardar partido</button>
                 </div>
 
                 <div class="card">
                     <div class="card-header">
-                        <h3>Registrar resultado final</h3>
+                        <h3>Modificar un partido</h3>
                     </div>
-                    <p style="font-size:13px; color:var(--text-muted); margin-bottom:15px;">Esto validará
-                        automáticamente si los usuarios acertaron o fallaron.</p>
-                    <div class="input-group">
-                        <label>Partido</label>
-                        <select id="res-id-partido">
-                            <option value="">Cargando partidos...</option>
-                        </select>
+                    <div class="flex-gap align-center mb-3">
+                        <div class="input-group" style="margin:0;"><label>Buscar código:</label><input type="number"
+                                id="mod-id-partido"></div>
+                        <button class="btn-primary mt-3" onclick="buscarPartidoModificar()">Buscar</button>
                     </div>
-                    <div class="grid-2">
-                        <div class="input-group"><label>Goles Reales Equipo A</label><input type="number"
-                                id="res-goles-a" min="0"></div>
-                        <div class="input-group"><label>Goles Reales Equipo B</label><input type="number"
-                                id="res-goles-b" min="0"></div>
+                    <div class="grid-2 align-center">
+                        <label>Equipo A actual:</label><select id="mod-equipo-a" disabled></select>
+                        <label>Equipo B actual:</label><select id="mod-equipo-b" disabled></select>
                     </div>
-                    <button class="btn-success full-width mt-3" onclick="guardarResultadoReal()">Guardar
-                        Resultado</button>
-                    <p id="resultado-msg" class="status-msg mt-3"></p>
+                    <button class="btn-success mt-3" style="margin: 0 auto; display: block;" id="btn-actualizar-partido"
+                        onclick="actualizarPartido()" disabled>Actualizar partido</button>
+                    <p id="mod-msg" class="status-msg mt-2"></p>
                 </div>
             </div>
 
@@ -110,18 +101,67 @@
                     <thead>
                         <tr>
                             <th>Código</th>
-                            <th>Partido</th>
                             <th>Fecha</th>
-                            <th>Resultado</th>
+                            <th>Hora</th>
+                            <th>Equipo A</th>
+                            <th>Equipo B</th>
                             <th>Acción</th>
                         </tr>
                     </thead>
                     <tbody>
                         <tr>
-                            <td colspan="5" style="text-align:center;color:var(--text-muted);">Cargando...</td>
+                            <td colspan="6" style="text-align:center;">Cargando...</td>
                         </tr>
                     </tbody>
                 </table>
+            </div>
+
+            <div class="card mt-3">
+                <div class="card-header">
+                    <h3>Pronósticos Registrados</h3>
+                    <button class="btn-small" onclick="cargarPronosticosBD()">🔄 Actualizar</button>
+                </div>
+                <table class="report-table" id="tabla-bd-pronosticos">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Usuario</th>
+                            <th>Partido</th>
+                            <th>Pronóstico (Goles A - B)</th>
+                            <th>Acción</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td colspan="5" style="text-align:center;">Cargando...</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div id="tab-res" class="tab-content">
+            <div class="header-section">
+                <h1>Registrar resultado de un partido</h1>
+            </div>
+            <div class="card" style="max-width: 600px; margin: 0 auto;">
+                <div class="flex-gap align-center mb-3">
+                    <div class="input-group" style="margin:0;"><label>Buscar código de partido:</label><input
+                            type="number" id="res-id-partido"></div>
+                    <button class="btn-primary mt-3" onclick="buscarParaResultado()">Buscar</button>
+                </div>
+
+                <div class="flex-gap align-center mb-3 justify-center" id="res-teams-display"
+                    style="font-weight:bold; font-size:18px; display:none;">
+                    <span id="res-lbl-a">Ecuador</span> <span style="font-size:12px; color:#888;">vs</span> <span
+                        id="res-lbl-b">Qatar</span>
+                </div>
+
+                <div class="grid-2 mb-3">
+                    <div class="input-group"><label>Goles equipo A:</label><input type="number" id="res-goles-a"></div>
+                    <div class="input-group"><label>Goles equipo B:</label><input type="number" id="res-goles-b"></div>
+                </div>
+                <button class="btn-success full-width" onclick="guardarResultadoReal()">Guardar resultado</button>
             </div>
         </div>
 
@@ -157,8 +197,6 @@
                     </div>
                 </div>
             </div>
-        </div>
-        </div>
         </div>
 
         <div id="tab-predict" class="tab-content">
@@ -233,18 +271,72 @@
                 <table class="report-table" id="tabla-ranking">
                     <thead>
                         <tr>
+                            <th>Ranking</th>
                             <th>Usuario</th>
-                            <th>Partido</th>
-                            <th>Pronóstico</th>
-                            <th>Estado</th>
+                            <th>Acertados</th>
+                            <th>Fallados</th>
+                            <th>Pronósticos</th>
                         </tr>
                     </thead>
                     <tbody>
                         <tr>
-                            <td colspan="4" style="text-align:center;color:var(--text-muted);">Cargando...</td>
+                            <td colspan="5" style="text-align:center;color:var(--text-muted);">Cargando...</td>
                         </tr>
                     </tbody>
                 </table>
+            </div>
+        </div>
+
+
+        <div id="tab-datos" class="tab-content">
+            <div class="header-section">
+                <h1>Gestión de Base de Datos</h1>
+                <p>Añade o elimina Equipos y Usuarios del sistema.</p>
+            </div>
+
+            <div class="grid-2-desktop">
+                <!-- Tarjeta de Equipos -->
+                <div class="card">
+                    <div class="card-header">
+                        <h3>Equipos</h3>
+                    </div>
+                    <div class="flex-gap align-center mb-3">
+                        <input type="text" id="nuevo-equipo-nombre" placeholder="Nombre del Equipo">
+                        <button class="btn-success" onclick="crearEquipoBD()">Guardar</button>
+                    </div>
+                    <table class="report-table" id="tabla-bd-equipos">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Nombre</th>
+                                <th>Acción</th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <h3>Usuarios</h3>
+                    </div>
+                    <div class="grid-2 mb-3">
+                        <input type="text" id="nuevo-user-nombre" placeholder="Nombre (Ej: Juan)">
+                        <input type="number" id="nuevo-user-codigo" placeholder="Código (Ej: 1234)">
+                    </div>
+                    <button class="btn-success full-width mb-3" onclick="crearUsuarioBD()">Guardar Usuario</button>
+
+                    <table class="report-table" id="tabla-bd-usuarios">
+                        <thead>
+                            <tr>
+                                <th>Código</th>
+                                <th>Nombre</th>
+                                <th>Acción</th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
             </div>
         </div>
 
@@ -259,6 +351,7 @@
                     <div class="input-group"><label>Pin LED Verde</label><input type="number" id="pin-led-g"></div>
                     <div class="input-group"><label>Pin LED Rojo</label><input type="number" id="pin-led-r"></div>
                     <div class="input-group"><label>Pin LED Azul</label><input type="number" id="pin-led-b"></div>
+                    <div class="input-group"><label>Pin LED Naranja</label><input type="number" id="pin-led-o"></div>
                 </div>
                 <h3 class="mb-3 mt-3">Teclado Matricial</h3>
                 <div class="grid-2">

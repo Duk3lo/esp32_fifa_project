@@ -1,8 +1,10 @@
 let appState = { connected: true };
-const JAVA_API_BASE = "http://localhost:8081"; // Cambiar a tu IP si usas celular
+const JAVA_API_BASE = "http://localhost:8081";
 
 window.addEventListener("load", () => {
     cargarPinesHardware();
+    cargarEquipos();
+    cargarPartidosAdmin();
     if (typeof connectWebSocket === "function") connectWebSocket();
     setInterval(async () => {
         try {
@@ -23,15 +25,28 @@ function showTab(tabId, btnElement) {
     document.querySelectorAll('.nav-btn').forEach(el => el.classList.remove('active'));
     document.getElementById(tabId).classList.add('active');
     if (btnElement) btnElement.classList.add('active');
-    if (tabId === 'tab-wifi' && typeof WifiUI !== "undefined") {
-        WifiUI.loadSaved();
+
+    if (tabId === 'tab-wifi' && typeof WifiUI !== "undefined") WifiUI.loadSaved();
+    if (tabId === 'tab-stats') cargarReportes();
+    if (tabId === 'tab-admin') { cargarPartidosAdmin(); cargarEquipos(); }
+    if (tabId === 'tab-datos') {
+        cargarEquiposBD();
+        cargarUsuariosBD();
+        cargarPronosticosBD();
     }
-    if (tabId === 'tab-stats') {
-        cargarReportes();
+
+    if (tabId === 'tab-predict') {
+        const msgEl = document.getElementById("predict-msg");
+        if (msgEl) {
+            msgEl.innerText = "";
+            msgEl.className = "status-msg mt-3";
+        }
+        document.getElementById("partido-codigo").value = "";
+        document.getElementById("goles-a").value = "";
+        document.getElementById("goles-b").value = "";
     }
 }
 
-// --- ANIMACIONES WEB (LEDS Y TECLADO) ---
 function simularLedVirtual(color, tiempoMs) {
     const led = document.getElementById(`v-led-${color}`);
     if (led) {
@@ -44,12 +59,11 @@ function animarTeclaVirtual(key) {
     const botones = document.querySelectorAll('.vk-btn');
     botones.forEach(btn => {
         if (btn.innerText.trim() === key) {
-            btn.classList.add('pressed'); // Hace que el botón se hunda en la pantalla
-            setTimeout(() => btn.classList.remove('pressed'), 200); // Lo suelta tras 200ms
+            btn.classList.add('pressed');
+            setTimeout(() => btn.classList.remove('pressed'), 200);
         }
     });
 }
-// ----------------------------------------
 
 let html5QrCode = null;
 
@@ -132,9 +146,6 @@ async function enviarPronostico() {
     document.getElementById("predict-msg").innerText = "Guardando...";
     document.getElementById("predict-msg").className = "status-badge waiting mt-3";
 
-    // Esto activa el LED Azul en el hardware
-    sendWsMessage("predict", { match: cod, goalsA: ga, goalsB: gb });
-
     try {
         let res = await fetch(`${JAVA_API_BASE}/api/pronosticos`, {
             method: "POST",
@@ -148,22 +159,28 @@ async function enviarPronostico() {
         });
 
         if (res.ok) {
+            sendWsMessage("predict", { match: cod, goalsA: ga, goalsB: gb });
+            simularLedVirtual("blue", 1500);
+
             document.getElementById("predict-msg").innerText = "¡Pronóstico Guardado en la Base de Datos!";
             document.getElementById("predict-msg").className = "status-badge success mt-3";
+
             document.getElementById("partido-codigo").value = "";
             document.getElementById("goles-a").value = "";
             document.getElementById("goles-b").value = "";
+            document.getElementById("partido-codigo").focus();
         } else {
             const errorMsg = await res.text();
             document.getElementById("predict-msg").innerText = "Error: " + errorMsg;
             document.getElementById("predict-msg").className = "status-badge error mt-3";
-            simularLedVirtual("red", 2000); // Activa el LED rojo virtual por error de duplicado o inexistente
+
+            activarLed("orange", 800);
+            setTimeout(() => activarLed("red", 1000), 800);
         }
     } catch (error) {
-        console.error("Error de conexión:", error);
-        document.getElementById("predict-msg").innerText = "Error de conexión con Java. Pulsa F12.";
+        document.getElementById("predict-msg").innerText = "Error de conexión con Java.";
         document.getElementById("predict-msg").className = "status-badge error mt-3";
-        simularLedVirtual("red", 2000);
+        activarLed("red", 2000);
     }
 }
 
@@ -181,17 +198,20 @@ async function cargarPinesHardware() {
             document.getElementById("pin-led-g").value = data.led_g || "";
             document.getElementById("pin-led-r").value = data.led_r || "";
             document.getElementById("pin-led-b").value = data.led_b || "";
+            document.getElementById("pin-led-o").value = data.led_o || "";
             document.getElementById("pin-filas").value = data.filas || "";
             document.getElementById("pin-cols").value = data.cols || "";
         }
     } catch (e) { }
 }
 
+
 async function guardarHardware() {
     const config = {
         led_g: parseInt(document.getElementById("pin-led-g").value),
         led_r: parseInt(document.getElementById("pin-led-r").value),
         led_b: parseInt(document.getElementById("pin-led-b").value),
+        led_o: parseInt(document.getElementById("pin-led-o").value) || 0,
         filas: document.getElementById("pin-filas").value,
         cols: document.getElementById("pin-cols").value
     };
@@ -205,39 +225,28 @@ async function guardarHardware() {
     } catch (e) { alert("Error al guardar"); }
 }
 
-// LECTURA CONSTANTE DEL TECLADO FÍSICO
-setInterval(async () => {
-    if (!document.getElementById("partido-codigo")) return;
-    try {
-        let res = await fetch("/api/keypad/poll");
-        let data = await res.json();
-
-        if (data.keys && data.keys.length > 0) {
-            let activeEl = document.activeElement;
-            if (activeEl.tagName !== "INPUT") activeEl = document.getElementById("partido-codigo");
-
-            data.keys.forEach(key => {
-                animarTeclaVirtual(key); // <--- HUNDE EL BOTÓN EN PANTALLA
-
-                if (key === '#') {
-                    if (activeEl.id === "partido-codigo") {
-                        document.getElementById("goles-a").focus();
-                        simularLedVirtual("green", 1000); // <--- PRENDE LED VERDE EN WEB
-                    } else if (activeEl.id === "goles-a") {
-                        document.getElementById("goles-b").focus();
-                        simularLedVirtual("green", 1000); // <--- PRENDE LED VERDE EN WEB
-                    }
-                } else if (key === '*') {
-                    enviarPronostico();
-                } else if (key === 'D') {
-                    activeEl.value = activeEl.value.slice(0, -1);
-                } else {
-                    activeEl.value += key;
-                }
-            });
-        }
-    } catch (e) { }
-}, 400);
+/*
+ * ⚠️ BUG CORREGIDO:
+ * Aquí existía un SEGUNDO setInterval que también hacía polling de
+ * "/api/keypad/poll" cada 400ms, en paralelo con el que está más abajo
+ * (el que llama a procesarIngresoTeclado). Los dos leían el mismo
+ * endpoint y procesaban las mismas teclas con lógica distinta:
+ *   - Este bloque duplicado NO manejaba la confirmación final con '#'
+ *     en el campo de goles B (nunca disparaba enviarPronostico() por
+ *     esa vía).
+ *   - Además usaba '*' para ENVIAR el pronóstico directamente, algo que
+ *     contradice el manual del Anteproyecto, donde '*' se usa para
+ *     CANCELAR (LED naranja -> rojo, "Pronóstico no registrado
+ *     correctamente").
+ * Al tener dos intervalos leyendo el mismo endpoint, cada tecla física
+ * podía procesarse dos veces (o de forma inconsistente, según cómo el
+ * ESP32 vacíe su buffer de teclado), generando dobles envíos, LEDs
+ * parpadeando de más, o el error de que a veces '*' guardaba el
+ * pronóstico en vez de cancelarlo.
+ * Se eliminó este bloque y se dejó un único intervalo (más abajo) que
+ * usa procesarIngresoTeclado(), la implementación completa y que sí
+ * coincide con el manual del documento.
+ */
 
 let chartPronosticos = null;
 
@@ -272,43 +281,88 @@ async function cargarRanking() {
         let data = await res.json();
 
         if (!data.length) {
-            tbody.innerHTML = `<tr><td colspan="4" style="text-align:center;color:var(--text-muted);">Sin pronósticos registrados</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;color:var(--text-muted);">Sin pronósticos registrados</td></tr>`;
             return;
         }
-        tbody.innerHTML = data.map(r => `
+        tbody.innerHTML = data.map((r, index) => `
             <tr>
-                <td>${r.usuario}</td><td>${r.partido}</td><td>${r.pronostico}</td>
-                <td><span class="estado-badge estado-${r.estado.toLowerCase()}">${r.estado}</span></td>
+                <td>${index + 1}</td>
+                <td>${r.usuario}</td>
+                <td style="color:var(--success)">${r.acertados || 0}</td>
+                <td style="color:var(--danger)">${r.fallados || 0}</td>
+                <td>${r.pronosticos_totales || 0}</td>
             </tr>
         `).join("");
     } catch (e) {
-        tbody.innerHTML = `<tr><td colspan="4" style="text-align:center;color:var(--danger);">Error conectando con Java</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;color:var(--danger);">Error conectando con Java</td></tr>`;
     }
 }
 
 function simularTecla(key) {
-    animarTeclaVirtual(key); // Hunde el botón cuando le haces click con el mouse
+    animarTeclaVirtual(key);
+    procesarIngresoTeclado(key);
+}
+
+setInterval(async () => {
+    if (!document.getElementById("partido-codigo")) return;
+    try {
+        let res = await fetch("/api/keypad/poll");
+        let data = await res.json();
+
+        if (data.keys && data.keys.length > 0) {
+            data.keys.forEach(key => {
+                animarTeclaVirtual(key);
+                procesarIngresoTeclado(key);
+            });
+        }
+    } catch (e) { }
+}, 400);
+
+function procesarIngresoTeclado(key) {
     let activeEl = document.activeElement;
     if (activeEl.tagName !== "INPUT") activeEl = document.getElementById("partido-codigo");
 
     if (key === '#') {
-        if (activeEl.id === "partido-codigo") {
-            document.getElementById("goles-a").focus();
-            simularLedVirtual("green", 1000);
-        } else if (activeEl.id === "goles-a") {
-            document.getElementById("goles-b").focus();
-            simularLedVirtual("green", 1000);
+        if (!activeEl.value || activeEl.value.trim() === '') {
+            activarLed("orange", 1500);
+        } else {
+            if (activeEl.id === "partido-codigo") {
+                document.getElementById("goles-a").focus();
+                activarLed("green", 1000);
+            } else if (activeEl.id === "goles-a") {
+                document.getElementById("goles-b").focus();
+                activarLed("green", 1000);
+            } else if (activeEl.id === "goles-b") {
+                activarLed("green", 500);
+                setTimeout(() => {
+                    enviarPronostico();
+                }, 500);
+            }
         }
-    } else if (key === '*') {
-        enviarPronostico();
-    } else if (key === 'D') {
+    }
+    else if (key === '*') {
+        activarLed("orange", 800);
+        setTimeout(() => activarLed("red", 1000), 800);
+
+        document.getElementById("predict-msg").innerText = "Pronóstico cancelado. En espera de nuevo código.";
+        document.getElementById("predict-msg").className = "status-badge error mt-3";
+
+        document.getElementById("partido-codigo").value = "";
+        document.getElementById("goles-a").value = "";
+        document.getElementById("goles-b").value = "";
+        document.getElementById("partido-codigo").focus();
+    }
+    else if (key === 'D') {
+
         activeEl.value = activeEl.value.slice(0, -1);
-    } else {
+    }
+    else {
+
         activeEl.value += key;
     }
 }
 
-// --- NUEVA LÓGICA DE VALIDACIÓN ESTRICTA ---
+
 async function validarYEntrar(code) {
     const status = document.getElementById("qr-status");
     status.innerText = "Validando en la base de datos...";
@@ -336,7 +390,7 @@ async function validarYEntrar(code) {
     } catch (error) {
         status.innerText = "Error conectando con Java.";
         status.className = "status-badge error mt-3";
-        simularLedVirtual("red", 1500);
+        activarLed("red", 1500);
     }
 }
 
@@ -354,24 +408,35 @@ async function crearPartido() {
     const id = document.getElementById("admin-id-partido").value;
     const eqA = document.getElementById("admin-equipo-a").value;
     const eqB = document.getElementById("admin-equipo-b").value;
+    const fecha = document.getElementById("admin-fecha-partido").value;
+    const hora = document.getElementById("admin-hora-partido").value;
 
-    if (!id || !eqA || !eqB) return alert("Completa todos los campos");
+    if (!id || !eqA || !eqB || !fecha || !hora) return alert("Completa todos los campos");
 
-    await fetch(`${JAVA_API_BASE}/api/partidos`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-            idPartido: parseInt(id),
-            idEquipoA: parseInt(eqA),
-            idEquipoB: parseInt(eqB),
-            fecha: new Date().toISOString().split('T')[0],
-            hora: "12:00:00"
-        })
-    });
-    alert("¡Partido creado correctamente!");
-    document.getElementById("admin-id-partido").value = "";
-    document.getElementById("admin-equipo-a").value = "";
-    document.getElementById("admin-equipo-b").value = "";
+    try {
+        let res = await fetch(`${JAVA_API_BASE}/api/partidos`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                idPartido: parseInt(id),
+                idEquipoA: parseInt(eqA),
+                idEquipoB: parseInt(eqB),
+                fecha: fecha,
+                hora: hora + ":00"
+            })
+        });
+
+        if (res.ok) {
+            alert("¡Partido creado correctamente!");
+            document.getElementById("admin-id-partido").value = "";
+            cargarPartidosAdmin();
+        } else {
+            const err = await res.text();
+            alert("Error al crear el partido: " + err);
+        }
+    } catch (e) {
+        alert("Error de conexión con Java.");
+    }
 }
 
 async function guardarResultadoReal() {
@@ -398,4 +463,260 @@ async function guardarResultadoReal() {
     } else {
         alert("Error: Partido no encontrado.");
     }
+}
+
+async function cargarPartidosAdmin() {
+    const tbody = document.querySelector("#tabla-partidos-admin tbody");
+    if (!tbody) return;
+    try {
+        let res = await fetch(`${JAVA_API_BASE}/api/partidos`);
+        let data = await res.json();
+
+        if (!data.length) {
+            tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;color:var(--text-muted);">No hay partidos registrados</td></tr>`;
+            return;
+        }
+
+        tbody.innerHTML = data.map(p => `
+            <tr>
+                <td>${p.idPartido}</td>
+                <td>${p.fecha}</td>
+                <td>${p.hora}</td>
+                <td>${p.equipoA.equipo}</td> 
+                <td>${p.equipoB.equipo}</td>
+                <td>
+                    <button class="btn-cancel btn-small" onclick="eliminarPartido(${p.idPartido})">Eliminar</button>
+                </td>
+            </tr>
+        `).join("");
+    } catch (e) { }
+}
+
+async function eliminarPartido(id) {
+    if (!confirm("¿Estás seguro de eliminar el partido " + id + "?")) return;
+    try {
+        let res = await fetch(`${JAVA_API_BASE}/api/partidos/${id}`, { method: "DELETE" });
+        if (res.ok) {
+            alert("Partido eliminado con éxito.");
+            cargarPartidosAdmin();
+
+            if (partidoModificarId == id) {
+                document.getElementById("mod-equipo-a").disabled = true;
+                document.getElementById("mod-equipo-b").disabled = true;
+                document.getElementById("btn-actualizar-partido").disabled = true;
+                document.getElementById("mod-msg").innerText = "";
+                document.getElementById("mod-id-partido").value = "";
+                partidoModificarId = null;
+            }
+        } else {
+            alert("No se puede eliminar (quizás ya tiene pronósticos vinculados).");
+        }
+    } catch (e) {
+        alert("Error de conexión al servidor Java.");
+    }
+}
+
+async function cargarEquipos() {
+    try {
+        let res = await fetch(`${JAVA_API_BASE}/api/equipos`);
+        let equipos = await res.json();
+        let options = `<option value="">Seleccione un equipo...</option>` +
+            equipos.map(e => `<option value="${e.idEquipo}">${e.equipo}</option>`).join("");
+
+        document.getElementById("admin-equipo-a").innerHTML = options;
+        document.getElementById("admin-equipo-b").innerHTML = options;
+        document.getElementById("mod-equipo-a").innerHTML = options;
+        document.getElementById("mod-equipo-b").innerHTML = options;
+    } catch (e) { console.log("Error cargando equipos", e); }
+}
+
+let partidoModificarId = null;
+async function buscarPartidoModificar() {
+    const id = document.getElementById("mod-id-partido").value;
+    if (!id) return alert("Ingrese un código a buscar");
+    try {
+        let res = await fetch(`${JAVA_API_BASE}/api/partidos/${id}`);
+        if (res.ok) {
+            let p = await res.json();
+            let resCheck = await fetch(`${JAVA_API_BASE}/api/partidos/${id}/verificar-pronosticos`);
+            let tienePronosticos = await resCheck.json();
+
+            if (tienePronosticos) {
+                document.getElementById("mod-equipo-a").disabled = true;
+                document.getElementById("mod-equipo-b").disabled = true;
+                document.getElementById("btn-actualizar-partido").disabled = true;
+                document.getElementById("mod-msg").innerText = "No se puede modificar, existen pronósticos vinculados.";
+                document.getElementById("mod-msg").className = "status-msg error mt-2";
+                partidoModificarId = null;
+                return;
+            }
+            partidoModificarId = p.idPartido;
+            document.getElementById("mod-equipo-a").value = p.equipoA.idEquipo;
+            document.getElementById("mod-equipo-b").value = p.equipoB.idEquipo;
+            document.getElementById("mod-equipo-a").disabled = false;
+            document.getElementById("mod-equipo-b").disabled = false;
+            document.getElementById("btn-actualizar-partido").disabled = false;
+            document.getElementById("mod-msg").innerText = "Partido encontrado. Modifica los equipos y presiona Actualizar.";
+            document.getElementById("mod-msg").className = "status-msg success mt-2";
+        } else {
+            alert("Partido no encontrado");
+        }
+    } catch (e) { alert("Error de conexión con Java"); }
+}
+
+
+async function actualizarPartido() {
+    if (!partidoModificarId) return;
+    const eqA = document.getElementById("mod-equipo-a").value;
+    const eqB = document.getElementById("mod-equipo-b").value;
+    try {
+        let res = await fetch(`${JAVA_API_BASE}/api/partidos/${partidoModificarId}`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                idEquipoA: parseInt(eqA),
+                idEquipoB: parseInt(eqB)
+            })
+        });
+        if (res.ok) {
+            alert("¡Partido actualizado correctamente!");
+            cargarPartidosAdmin();
+            document.getElementById("mod-equipo-a").disabled = true;
+            document.getElementById("mod-equipo-b").disabled = true;
+            document.getElementById("btn-actualizar-partido").disabled = true;
+            document.getElementById("mod-msg").innerText = "";
+            document.getElementById("mod-id-partido").value = "";
+        } else {
+            let err = await res.text();
+            alert("Error: " + err);
+        }
+    } catch (e) { alert("Error de conexión"); }
+}
+
+async function buscarParaResultado() {
+    const id = document.getElementById("res-id-partido").value;
+    if (!id) return alert("Ingrese un código de partido");
+    try {
+        let res = await fetch(`${JAVA_API_BASE}/api/partidos/${id}`);
+        if (res.ok) {
+            let p = await res.json();
+            document.getElementById("res-lbl-a").innerText = p.equipoA.equipo;
+            document.getElementById("res-lbl-b").innerText = p.equipoB.equipo;
+            document.getElementById("res-teams-display").style.display = "flex";
+        } else {
+            alert("Partido no encontrado");
+        }
+    } catch (e) { alert("Error de conexión"); }
+}
+
+
+async function cargarEquiposBD() {
+    const tbody = document.querySelector("#tabla-bd-equipos tbody");
+    try {
+        let res = await fetch(`${JAVA_API_BASE}/api/equipos`);
+        let data = await res.json();
+        tbody.innerHTML = data.map(e => `
+            <tr>
+                <td>${e.idEquipo}</td>
+                <td>${e.equipo}</td>
+                <td><button class="btn-cancel btn-small" onclick="eliminarEquipoBD(${e.idEquipo})">X</button></td>
+            </tr>
+        `).join("");
+    } catch (e) { }
+}
+
+async function crearEquipoBD() {
+    const nombre = document.getElementById("nuevo-equipo-nombre").value;
+    if (!nombre) return alert("Ingrese un nombre");
+    await fetch(`${JAVA_API_BASE}/api/equipos`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ equipo: nombre })
+    });
+    document.getElementById("nuevo-equipo-nombre").value = "";
+    cargarEquiposBD();
+    cargarEquipos();
+}
+
+async function eliminarEquipoBD(id) {
+    if (!confirm("¿Eliminar equipo?")) return;
+    let res = await fetch(`${JAVA_API_BASE}/api/equipos/${id}`, { method: "DELETE" });
+    if (res.ok) { cargarEquiposBD(); cargarEquipos(); }
+    else { alert(await res.text()); }
+}
+
+
+async function cargarUsuariosBD() {
+    const tbody = document.querySelector("#tabla-bd-usuarios tbody");
+    try {
+        let res = await fetch(`${JAVA_API_BASE}/api/usuarios`);
+        let data = await res.json();
+        tbody.innerHTML = data.map(u => `
+            <tr>
+                <td>${u.codigo}</td>
+                <td>${u.nombre}</td>
+                <td><button class="btn-cancel btn-small" onclick="eliminarUsuarioBD(${u.idUsuario})">X</button></td>
+            </tr>
+        `).join("");
+    } catch (e) { }
+}
+
+async function crearUsuarioBD() {
+    const nombre = document.getElementById("nuevo-user-nombre").value;
+    const codigo = document.getElementById("nuevo-user-codigo").value;
+    if (!nombre || !codigo) return alert("Complete los campos");
+    await fetch(`${JAVA_API_BASE}/api/usuarios`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ nombre: nombre, codigo: parseInt(codigo) })
+    });
+    document.getElementById("nuevo-user-nombre").value = "";
+    document.getElementById("nuevo-user-codigo").value = "";
+    cargarUsuariosBD();
+}
+
+async function eliminarUsuarioBD(id) {
+    if (!confirm("¿Eliminar usuario?")) return;
+    let res = await fetch(`${JAVA_API_BASE}/api/usuarios/${id}`, { method: "DELETE" });
+    if (res.ok) cargarUsuariosBD();
+    else alert(await res.text());
+}
+
+async function cargarPronosticosBD() {
+    const tbody = document.querySelector("#tabla-bd-pronosticos tbody");
+    if (!tbody) return;
+    try {
+        let res = await fetch(`${JAVA_API_BASE}/api/pronosticos`);
+        let data = await res.json();
+
+        if (!data.length) {
+            tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;color:var(--text-muted);">No hay pronósticos registrados</td></tr>`;
+            return;
+        }
+
+        tbody.innerHTML = data.map(p => {
+            let partidoStr = `${p.partido.equipoA.equipo} vs ${p.partido.equipoB.equipo}`;
+            return `
+            <tr>
+                <td>${p.idPronostico}</td>
+                <td>${p.usuario.nombre}</td>
+                <td>${partidoStr} <span style="color:var(--text-muted); font-size:11px;">(ID: ${p.partido.idPartido})</span></td>
+                <td style="font-weight:bold;">${p.golesEquipoA} - ${p.golesEquipoB}</td>
+                <td><button class="btn-cancel btn-small" onclick="eliminarPronosticoBD(${p.idPronostico})">X Eliminar</button></td>
+            </tr>
+        `}).join("");
+    } catch (e) { }
+}
+
+async function eliminarPronosticoBD(id) {
+    if (!confirm("¿Estás seguro de eliminar este pronóstico? Se restará de las estadísticas.")) return;
+    try {
+        let res = await fetch(`${JAVA_API_BASE}/api/pronosticos/${id}`, { method: "DELETE" });
+        if (res.ok) {
+            cargarPronosticosBD();
+            cargarReportes();
+        } else {
+            alert(await res.text());
+        }
+    } catch (e) { alert("Error de conexión"); }
 }

@@ -42,4 +42,19 @@ public class PronosticoController {
 
         return ResponseEntity.ok(pronosticoRepo.save(p));
     }
+
+    @GetMapping
+    public ResponseEntity<?> listarPronosticos() {
+        return ResponseEntity.ok(pronosticoRepo.findAllConDetalle());
+    }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<?> eliminarPronostico(@PathVariable Integer id) {
+        try {
+            pronosticoRepo.deleteById(id);
+            return ResponseEntity.ok().build();
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body("Error al eliminar el pronóstico.");
+        }
+    }
 }

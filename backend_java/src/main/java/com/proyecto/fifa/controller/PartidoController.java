@@ -86,4 +86,19 @@ public class PartidoController {
         partido.setGolesEquipoB(req.getGolesEquipoB());
         return ResponseEntity.ok(partidoRepo.save(partido));
     }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<?> eliminar(@PathVariable Integer id) {
+        try {
+            partidoRepo.deleteById(id);
+            return ResponseEntity.ok().build();
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body("No se puede eliminar, el partido ya tiene pronósticos vinculados.");
+        }
+    }
+
+    @GetMapping("/{id}/verificar-pronosticos")
+    public ResponseEntity<Boolean> verificarPronosticos(@PathVariable Integer id) {
+        return ResponseEntity.ok(pronosticoRepo.existsByPartido_IdPartido(id));
+    }
 }

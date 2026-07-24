@@ -57,28 +57,6 @@ public class Esp32Service {
         return new RestTemplate(factory);
     }
 
-    @Scheduled(fixedRate = 400)
-    public void pollTeclado() {
-        try {
-            String url = espUrl + "/api/keypad/poll?last_id=" + lastKeypadId;
-            KeypadResponse resp = restTemplate.getForObject(url, KeypadResponse.class);
-
-            if (resp != null) {
-                if (resp.getLast_id() > lastKeypadId) {
-                    lastKeypadId = resp.getLast_id();
-                }
-
-                if (resp.getKeys() != null && !resp.getKeys().isEmpty()) {
-                    for (String key : resp.getKeys()) {
-                        procesarTecla(key);
-                    }
-                }
-            }
-        } catch (Exception e) {
-            // ESP32 offline o no alcanzable dentro del timeout configurado
-        }
-    }
-
     private void procesarTecla(@Nonnull String tecla) {
         if (tecla.equals("#") || tecla.equals("*")) {
             String input = buffer.toString();

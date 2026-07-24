@@ -53,6 +53,7 @@ pub fn register_ws_handler(
                                 "green" => { let _ = leds.green.set_high(); },
                                 "red" => { let _ = leds.red.set_high(); },
                                 "blue" => { let _ = leds.blue.set_high(); },
+                                "orange" => { let _ = leds.orange.set_high(); },
                                 _ => {}
                             }
                         }

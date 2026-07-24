@@ -1,7 +1,6 @@
 package com.proyecto.fifa.controller;
 
 import com.proyecto.fifa.dto.ConteoPronosticoDTO;
-import com.proyecto.fifa.dto.RankingDTO;
 import com.proyecto.fifa.model.Partido;
 import com.proyecto.fifa.model.Pronostico;
 import com.proyecto.fifa.repository.PronosticoRepository;
@@ -31,33 +30,42 @@ public class ReporteController {
     }
 
     @GetMapping("/ranking")
-    public List<RankingDTO> ranking() {
+    public List<Map<String, Object>> ranking() {
         List<Pronostico> todos = pronosticoRepo.findAllConDetalle();
-        Map<String, Long> aciertosPorUsuario = new HashMap<>();
-        List<RankingDTO> detalle = new ArrayList<>();
+
+        Map<String, Map<String, Object>> agrupado = new HashMap<>();
 
         for (Pronostico p : todos) {
-            Partido partido = p.getPartido();
-            String nombrePartido = partido.getEquipoA().getEquipo() + " vs " + partido.getEquipoB().getEquipo();
-            String pronosticoTexto = p.getGolesEquipoA() + "-" + p.getGolesEquipoB();
+            String nombreUsuario = p.getUsuario().getNombre();
 
-            String estado;
-            if (partido.getGolesEquipoA() == null || partido.getGolesEquipoB() == null) {
-                estado = "PENDIENTE";
-            } else if (partido.getGolesEquipoA().equals(p.getGolesEquipoA())
-                    && partido.getGolesEquipoB().equals(p.getGolesEquipoB())) {
-                estado = "ACIERTO";
-                aciertosPorUsuario.merge(p.getUsuario().getNombre(), 1L, Long::sum);
-            } else {
-                estado = "FALLO";
+            agrupado.putIfAbsent(nombreUsuario, new HashMap<>(Map.of(
+                    "usuario", nombreUsuario,
+                    "acertados", 0,
+                    "fallados", 0,
+                    "pronosticos_totales", 0
+            )));
+
+            Map<String, Object> stats = agrupado.get(nombreUsuario);
+
+            stats.put("pronosticos_totales", (int) stats.get("pronosticos_totales") + 1);
+
+            Partido partido = p.getPartido();
+
+            if (partido.getGolesEquipoA() != null && partido.getGolesEquipoB() != null) {
+                if (partido.getGolesEquipoA().equals(p.getGolesEquipoA()) &&
+                        partido.getGolesEquipoB().equals(p.getGolesEquipoB())) {
+                    // Pronóstico idéntico al resultado real = ACIERTO
+                    stats.put("acertados", (int) stats.get("acertados") + 1);
+                } else {
+                    stats.put("fallados", (int) stats.get("fallados") + 1);
+                }
             }
-            detalle.add(new RankingDTO(p.getUsuario().getNombre(), nombrePartido, pronosticoTexto, estado));
         }
 
-        detalle.sort((a, b) -> Long.compare(
-                aciertosPorUsuario.getOrDefault(b.getUsuario(), 0L),
-                aciertosPorUsuario.getOrDefault(a.getUsuario(), 0L)));
+        List<Map<String, Object>> listaRanking = new ArrayList<>(agrupado.values());
 
-        return detalle;
+        listaRanking.sort((a, b) -> Integer.compare((int) b.get("acertados"), (int) a.get("acertados")));
+
+        return listaRanking;
     }
 }

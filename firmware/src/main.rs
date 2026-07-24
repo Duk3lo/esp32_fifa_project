@@ -12,8 +12,8 @@ use wifi::manager::start_wifi_manager;
 use wifi::mdns::start_mdns;
 use wifi::scanner;
 
-use hardware::leds::{SystemLeds, SharedLeds};
 use hardware::keypad::{start_keypad_service, KeyEvent};
+use hardware::leds::{SharedLeds, SystemLeds};
 
 fn main() {
     esp_idf_svc::sys::link_patches();
@@ -24,7 +24,8 @@ fn main() {
     let nvs_partition = EspDefaultNvsPartition::take().expect("Error NVS");
 
     // 1. Inicializar WiFi y mDNS
-    let wifi_handle = start_wifi(peripherals.modem, sysloop.clone(), nvs_partition.clone()).expect("Error WiFi");
+    let wifi_handle =
+        start_wifi(peripherals.modem, sysloop.clone(), nvs_partition.clone()).expect("Error WiFi");
     let _mdns = start_mdns().expect("Error mDNS");
     start_wifi_manager(wifi_handle.clone(), nvs_partition.clone());
 
@@ -42,9 +43,10 @@ fn main() {
                 let led_g = parsed.get("led_g").and_then(|v| v.as_u64()).unwrap_or(0) as u32;
                 let led_r = parsed.get("led_r").and_then(|v| v.as_u64()).unwrap_or(0) as u32;
                 let led_b = parsed.get("led_b").and_then(|v| v.as_u64()).unwrap_or(0) as u32;
+                let led_o = parsed.get("led_o").and_then(|v| v.as_u64()).unwrap_or(0) as u32;
 
-                if led_g > 0 && led_r > 0 && led_b > 0 {
-                    match SystemLeds::new(led_g, led_r, led_b) {
+                if led_g > 0 && led_r > 0 && led_b > 0 && led_o > 0 {
+                    match SystemLeds::new(led_g, led_r, led_b, led_o) {
                         Ok(leds) => {
                             *shared_leds.lock().unwrap() = Some(leds);
                             log::info!("LEDs inicializados correctamente.");
@@ -67,8 +69,9 @@ fn main() {
         nvs_partition.clone(),
         scan_state,
         keypad_buf.clone(),
-        shared_leds.clone()
-    ).expect("Error Servidor");
+        shared_leds.clone(),
+    )
+    .expect("Error Servidor");
 
     log::info!("🚀 Sistema FIFA 2026 ONLINE");
 

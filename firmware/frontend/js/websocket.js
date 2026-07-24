@@ -14,6 +14,9 @@ function connectWebSocket() {
     ws.onmessage = (event) => {
         const data = JSON.parse(event.data);
         if (data.type === "auth_success") {
+            if (typeof usuarioActualWeb !== "undefined" && (data.codigo || data.usuario)) {
+                usuarioActualWeb = parseInt(data.codigo || data.usuario);
+            }
             document.getElementById("qr-status").innerText = "¡Usuario Autenticado!";
             document.getElementById("qr-status").className = "status-badge success";
             document.getElementById("predict-form").style.opacity = "1";
@@ -26,15 +29,16 @@ function connectWebSocket() {
             document.getElementById("predict-msg").innerText = "¡Pronóstico Guardado!";
             document.getElementById("predict-msg").className = "status-badge success mt-3";
         }
-
         if (data.type === "led_update") {
-            document.getElementById("v-led-green").classList.remove("on");
-            document.getElementById("v-led-red").classList.remove("on");
-            document.getElementById("v-led-blue").classList.remove("on");
-
-            if (data.color === "green" && data.state === "on") document.getElementById("v-led-green").classList.add("on");
-            if (data.color === "red" && data.state === "on") document.getElementById("v-led-red").classList.add("on");
-            if (data.color === "blue" && data.state === "on") document.getElementById("v-led-blue").classList.add("on");
+            const colors = ["green", "red", "blue", "orange"];
+            colors.forEach(c => {
+                const el = document.getElementById(`v-led-${c}`);
+                if (el) el.classList.remove("on");
+            });
+            if (data.state === "on") {
+                const activeLed = document.getElementById(`v-led-${data.color}`);
+                if (activeLed) activeLed.classList.add("on");
+            }
         }
     };
 

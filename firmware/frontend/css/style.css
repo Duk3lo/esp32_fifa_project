@@ -64,11 +64,25 @@ body { background-color: var(--bg-dark); color: var(--text-main); display: flex;
 
 .input-group { margin-bottom: 15px; }
 .input-group label { display: block; margin-bottom: 8px; font-size: 14px; color: var(--text-muted); }
-input[type="text"], input[type="number"], input[type="password"] {
+:root {
+    color-scheme: dark;
+}
+
+input[type="text"], input[type="number"], input[type="password"], 
+input[type="date"], input[type="time"], select {
     width: 100%; padding: 12px 15px; background: rgba(0,0,0,0.2); border: 1px solid var(--border);
     border-radius: 8px; color: #fff; font-size: 15px; transition: 0.3s;
 }
-input:focus { outline: none; border-color: var(--primary); background: rgba(0,0,0,0.4); }
+
+input:focus, select:focus { outline: none; border-color: var(--primary); background: rgba(0,0,0,0.4); }
+
+select option { background: var(--bg-card); color: #fff; }
+
+input:disabled, select:disabled { 
+    opacity: 0.5; 
+    cursor: not-allowed; 
+    background: rgba(255,255,255,0.05); 
+}
 
 .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
 .grid-2-desktop { display: grid; grid-template-columns: 1fr; gap: 25px; }
@@ -144,14 +158,23 @@ input:checked + .slider:before { transform: translateX(24px); }
     background: #111; padding: 10px; border-radius: 50%; border: 2px solid #333;
 }
 .led {
-    width: 20px; height: 20px; border-radius: 50%; opacity: 0.3; transition: 0.3s;
-    box-shadow: inset 0 0 5px rgba(0,0,0,0.5);
+    width: 20px; height: 20px; border-radius: 50%; opacity: 0.2; transition: 0.3s;
+    box-shadow: inset 0 0 5px rgba(0,0,0,0.8);
 }
 .led.on { opacity: 1; }
 
-.led-green.on { background: #00ff00; box-shadow: 0 0 15px #00ff00, inset 0 0 5px #fff; }
-.led-red.on { background: #ff0000; box-shadow: 0 0 15px #ff0000, inset 0 0 5px #fff; }
-.led-blue.on { background: #0088ff; box-shadow: 0 0 15px #0088ff, inset 0 0 5px #fff; }
+/* Colores cuando están APAGADOS (Se verán opacos por el opacity: 0.2) */
+.led-green { background-color: #00ff00; }
+.led-red { background-color: #ff0000; }
+.led-blue { background-color: #0088ff; }
+.led-orange { background-color: #ff9800; }
+
+/* Brillo cuando están ENCENDIDOS (.on) */
+.led-green.on { box-shadow: 0 0 15px #00ff00, inset 0 0 5px #fff; }
+.led-red.on { box-shadow: 0 0 15px #ff0000, inset 0 0 5px #fff; }
+.led-blue.on { box-shadow: 0 0 15px #0088ff, inset 0 0 5px #fff; }
+.led-orange.on { box-shadow: 0 0 15px #ff9800, inset 0 0 5px #fff; }
+
 
 button:disabled { opacity: 0.5; cursor: not-allowed; }
 
