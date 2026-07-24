@@ -379,7 +379,7 @@ async function validarYEntrar(code) {
             setTimeout(() => {
                 document.getElementById("predict-form").style.opacity = "1";
                 document.getElementById("predict-form").style.pointerEvents = "auto";
-                showTab('tab-predict', document.querySelectorAll('.nav-btn')[1]);
+                showTab('tab-predict', document.querySelectorAll('.nav-btn')[5]);
             }, 800);
 
         } else {

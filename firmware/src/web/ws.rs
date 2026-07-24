@@ -112,6 +112,7 @@ fn cambiar_led(shared_leds: &SharedLeds, color: &str, on: bool) {
                     "green" => { let _ = leds.green.set_high(); },
                     "red" => { let _ = leds.red.set_high(); },
                     "blue" => { let _ = leds.blue.set_high(); },
+                    "orange" => { let _ = leds.orange.set_high(); },
                     _ => {}
                 }
             }

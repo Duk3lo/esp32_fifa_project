@@ -36,6 +36,12 @@ public class PartidoController {
                 .orElse(ResponseEntity.notFound().build());
     }
 
+    // NUEVO ENDPOINT: Verifica si el partido tiene pronósticos asociados (Regla del PDF pág. 3)
+    @GetMapping("/{id}/verificar-pronosticos")
+    public ResponseEntity<Boolean> verificarPronosticos(@PathVariable Integer id) {
+        return ResponseEntity.ok(pronosticoRepo.existsByPartido_IdPartido(id));
+    }
+
     @PostMapping
     public ResponseEntity<?> agregar(@Nonnull @RequestBody PartidoRequest req) {
         Equipo equipoA = equipoRepo.findById(req.getIdEquipoA()).orElse(null);
@@ -95,10 +101,5 @@ public class PartidoController {
         } catch (Exception e) {
             return ResponseEntity.badRequest().body("No se puede eliminar, el partido ya tiene pronósticos vinculados.");
         }
-    }
-
-    @GetMapping("/{id}/verificar-pronosticos")
-    public ResponseEntity<Boolean> verificarPronosticos(@PathVariable Integer id) {
-        return ResponseEntity.ok(pronosticoRepo.existsByPartido_IdPartido(id));
     }
 }
