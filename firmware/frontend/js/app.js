@@ -1,5 +1,7 @@
 let appState = { connected: true };
 const JAVA_API_BASE = "http://localhost:8081";
+let lastKeypadId = 0;
+let isPolling = false;
 
 window.addEventListener("load", () => {
     cargarPinesHardware();
@@ -225,28 +227,6 @@ async function guardarHardware() {
     } catch (e) { alert("Error al guardar"); }
 }
 
-/*
- * ⚠️ BUG CORREGIDO:
- * Aquí existía un SEGUNDO setInterval que también hacía polling de
- * "/api/keypad/poll" cada 400ms, en paralelo con el que está más abajo
- * (el que llama a procesarIngresoTeclado). Los dos leían el mismo
- * endpoint y procesaban las mismas teclas con lógica distinta:
- *   - Este bloque duplicado NO manejaba la confirmación final con '#'
- *     en el campo de goles B (nunca disparaba enviarPronostico() por
- *     esa vía).
- *   - Además usaba '*' para ENVIAR el pronóstico directamente, algo que
- *     contradice el manual del Anteproyecto, donde '*' se usa para
- *     CANCELAR (LED naranja -> rojo, "Pronóstico no registrado
- *     correctamente").
- * Al tener dos intervalos leyendo el mismo endpoint, cada tecla física
- * podía procesarse dos veces (o de forma inconsistente, según cómo el
- * ESP32 vacíe su buffer de teclado), generando dobles envíos, LEDs
- * parpadeando de más, o el error de que a veces '*' guardaba el
- * pronóstico en vez de cancelarlo.
- * Se eliminó este bloque y se dejó un único intervalo (más abajo) que
- * usa procesarIngresoTeclado(), la implementación completa y que sí
- * coincide con el manual del documento.
- */
 
 let chartPronosticos = null;
 
@@ -305,8 +285,11 @@ function simularTecla(key) {
 
 setInterval(async () => {
     if (!document.getElementById("partido-codigo")) return;
+    if (isPolling) return;
+
+    isPolling = true;
     try {
-        let res = await fetch("/api/keypad/poll");
+        let res = await fetch(`/api/keypad/poll?last_id=${lastKeypadId}`);
         let data = await res.json();
 
         if (data.keys && data.keys.length > 0) {
@@ -315,7 +298,14 @@ setInterval(async () => {
                 procesarIngresoTeclado(key);
             });
         }
-    } catch (e) { }
+
+        if (data.last_id !== undefined) {
+            lastKeypadId = data.last_id;
+        }
+    } catch (e) {
+    } finally {
+        isPolling = false;
+    }
 }, 400);
 
 function procesarIngresoTeclado(key) {

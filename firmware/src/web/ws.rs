@@ -18,15 +18,19 @@ struct WsIncoming {
 pub fn register_ws_handler(
     server: &mut EspHttpServer<'static>,
     shared_leds: SharedLeds,
-    wifi: SharedWifi
+    wifi: SharedWifi,
 ) -> Result<()> {
     server.ws_handler("/ws", None, move |ws| {
-        if ws.is_new() || ws.is_closed() { return Ok(()); }
+        if ws.is_new() || ws.is_closed() {
+            return Ok(());
+        }
         let is_connected = wifi.lock().unwrap().is_connected().unwrap_or(false);
         if !is_connected {
             let _ = ws.send(
                 FrameType::Text(false),
-                json!({"type": "error", "msg": "Modo AP: WebSocket Deshabilitado"}).to_string().as_bytes()
+                json!({"type": "error", "msg": "Modo AP: WebSocket Deshabilitado"})
+                    .to_string()
+                    .as_bytes(),
             );
             return Ok(());
         }
@@ -36,67 +40,139 @@ pub fn register_ws_handler(
             Ok(val) => val,
             Err(_) => return Ok(()),
         };
-        if len == 0 { return Ok::<(), esp_idf_svc::sys::EspError>(()); }
+        if len == 0 {
+            return Ok::<(), esp_idf_svc::sys::EspError>(());
+        }
 
-        let raw = String::from_utf8_lossy(&buf[..len]);
+        let raw_full = String::from_utf8_lossy(&buf[..len]);
+        let raw = raw_full.trim_end_matches('\0');
+        log::info!("📩 WS mensaje crudo (len={}): {:?}", raw.len(), raw);
+
         if let Ok(msg) = serde_json::from_str::<WsIncoming>(&raw) {
-            
             if msg.msg_type == "java_led_cmd" {
-                let color = msg.payload.get("color").and_then(|v| v.as_str()).unwrap_or("");
-                let state = msg.payload.get("state").and_then(|v| v.as_str()).unwrap_or("off");
-                
+                let color = msg
+                    .payload
+                    .get("color")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("");
+                let state = msg
+                    .payload
+                    .get("state")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("off");
+
+                log::info!("👉 java_led_cmd: color={} state={}", color, state);
+
                 if let Ok(mut lock) = shared_leds.lock() {
                     if let Some(leds) = lock.as_mut() {
                         leds.turn_off_all();
                         if state == "on" {
                             match color {
-                                "green" => { let _ = leds.green.set_high(); },
-                                "red" => { let _ = leds.red.set_high(); },
-                                "blue" => { let _ = leds.blue.set_high(); },
-                                "orange" => { let _ = leds.orange.set_high(); },
-                                _ => {}
+                                "green" => {
+                                    let _ = leds.green.set_high();
+                                }
+                                "red" => {
+                                    let _ = leds.red.set_high();
+                                }
+                                "blue" => {
+                                    let _ = leds.blue.set_high();
+                                }
+                                "orange" => {
+                                    let _ = leds.orange.set_high();
+                                }
+                                _ => {
+                                    log::warn!("⚠️ Color no reconocido: {}", color);
+                                }
                             }
                         }
+                    } else {
+                        log::warn!("⚠️ shared_leds está en None al recibir java_led_cmd");
                     }
+                } else {
+                    log::warn!("⚠️ No se pudo tomar el lock de shared_leds");
                 }
-                let _ = ws.send(FrameType::Text(false), 
-                    json!({"type": "led_update", "color": color, "state": state}).to_string().as_bytes()
+                let _ = ws.send(
+                    FrameType::Text(false),
+                    json!({"type": "led_update", "color": color, "state": state})
+                        .to_string()
+                        .as_bytes(),
                 );
-            }
+            } else if msg.msg_type == "auth_qr" {
+                let code = msg
+                    .payload
+                    .get("code")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("");
 
-            else if msg.msg_type == "auth_qr" {
-                let code = msg.payload.get("code").and_then(|v| v.as_str()).unwrap_or("");
-                
                 if code.chars().all(char::is_numeric) && !code.is_empty() {
                     cambiar_led(&shared_leds, "green", true);
-                    let _ = ws.send(FrameType::Text(false), json!({"type": "led_update", "color": "green", "state": "on"}).to_string().as_bytes());
-                    
+                    let _ = ws.send(
+                        FrameType::Text(false),
+                        json!({"type": "led_update", "color": "green", "state": "on"})
+                            .to_string()
+                            .as_bytes(),
+                    );
+
                     std::thread::sleep(std::time::Duration::from_millis(800));
-                    let _ = ws.send(FrameType::Text(false), json!({"type": "auth_success"}).to_string().as_bytes());
-                    
+                    let _ = ws.send(
+                        FrameType::Text(false),
+                        json!({"type": "auth_success"}).to_string().as_bytes(),
+                    );
+
                     cambiar_led(&shared_leds, "green", false);
-                    let _ = ws.send(FrameType::Text(false), json!({"type": "led_update", "color": "green", "state": "off"}).to_string().as_bytes());
+                    let _ = ws.send(
+                        FrameType::Text(false),
+                        json!({"type": "led_update", "color": "green", "state": "off"})
+                            .to_string()
+                            .as_bytes(),
+                    );
                 } else {
                     cambiar_led(&shared_leds, "red", true);
-                    let _ = ws.send(FrameType::Text(false), json!({"type": "led_update", "color": "red", "state": "on"}).to_string().as_bytes());
-                    let _ = ws.send(FrameType::Text(false), json!({"type": "auth_error"}).to_string().as_bytes());
-                    
+                    let _ = ws.send(
+                        FrameType::Text(false),
+                        json!({"type": "led_update", "color": "red", "state": "on"})
+                            .to_string()
+                            .as_bytes(),
+                    );
+                    let _ = ws.send(
+                        FrameType::Text(false),
+                        json!({"type": "auth_error"}).to_string().as_bytes(),
+                    );
+
                     std::thread::sleep(std::time::Duration::from_millis(1500));
                     cambiar_led(&shared_leds, "red", false);
-                    let _ = ws.send(FrameType::Text(false), json!({"type": "led_update", "color": "red", "state": "off"}).to_string().as_bytes());
+                    let _ = ws.send(
+                        FrameType::Text(false),
+                        json!({"type": "led_update", "color": "red", "state": "off"})
+                            .to_string()
+                            .as_bytes(),
+                    );
                 }
-            }
-
-            else if msg.msg_type == "predict" {
+            } else if msg.msg_type == "predict" {
                 cambiar_led(&shared_leds, "blue", true);
-                let _ = ws.send(FrameType::Text(false), json!({"type": "led_update", "color": "blue", "state": "on"}).to_string().as_bytes());
-                
+                let _ = ws.send(
+                    FrameType::Text(false),
+                    json!({"type": "led_update", "color": "blue", "state": "on"})
+                        .to_string()
+                        .as_bytes(),
+                );
+
                 std::thread::sleep(std::time::Duration::from_millis(1000));
-                let _ = ws.send(FrameType::Text(false), json!({"type": "predict_success"}).to_string().as_bytes());
-                
+                let _ = ws.send(
+                    FrameType::Text(false),
+                    json!({"type": "predict_success"}).to_string().as_bytes(),
+                );
+
                 cambiar_led(&shared_leds, "blue", false);
-                let _ = ws.send(FrameType::Text(false), json!({"type": "led_update", "color": "blue", "state": "off"}).to_string().as_bytes());
+                let _ = ws.send(
+                    FrameType::Text(false),
+                    json!({"type": "led_update", "color": "blue", "state": "off"})
+                        .to_string()
+                        .as_bytes(),
+                );
             }
+        } else {
+            log::warn!("⚠️ No se pudo parsear el mensaje WS como JSON válido");
         }
         Ok::<(), esp_idf_svc::sys::EspError>(())
     })?;
@@ -104,18 +180,29 @@ pub fn register_ws_handler(
 }
 
 fn cambiar_led(shared_leds: &SharedLeds, color: &str, on: bool) {
+    log::info!("🎨 cambiar_led: color={} on={}", color, on);
     if let Ok(mut lock) = shared_leds.lock() {
         if let Some(leds) = lock.as_mut() {
             leds.turn_off_all();
             if on {
                 match color {
-                    "green" => { let _ = leds.green.set_high(); },
-                    "red" => { let _ = leds.red.set_high(); },
-                    "blue" => { let _ = leds.blue.set_high(); },
-                    "orange" => { let _ = leds.orange.set_high(); },
+                    "green" => {
+                        let _ = leds.green.set_high();
+                    }
+                    "red" => {
+                        let _ = leds.red.set_high();
+                    }
+                    "blue" => {
+                        let _ = leds.blue.set_high();
+                    }
+                    "orange" => {
+                        let _ = leds.orange.set_high();
+                    }
                     _ => {}
                 }
             }
+        } else {
+            log::warn!("⚠️ shared_leds está en None dentro de cambiar_led");
         }
     }
 }
